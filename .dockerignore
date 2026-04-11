@@ -1,5 +1,6 @@
-.venv
-.git
-__pycache__
-.python-version
-.uv
+.venv/
+node_modules/
+__pycache__/
+.env
+.git/
+opgg-mcp/node_modules/

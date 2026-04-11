@@ -2,34 +2,27 @@ import os
 import uuid
 import asyncio
 from dotenv import load_dotenv
-
-# 1. Load Environment Variables First!
-load_dotenv()
-
 from langchain_core.messages import HumanMessage
 from langchain_ollama import ChatOllama
 from langgraph.graph import StateGraph, START, END
 from langgraph.checkpoint.memory import MemorySaver
 import operator
 from typing import TypedDict, Annotated, Sequence
-
-# 2. Import your hard work!
 from app.agent.nodes.opgg_worker import opgg_worker_node
-from app.agent.nodes.reddit_worker import reddit_worker_node
+from app.agent.nodes.research_worker import research_worker_node
 from app.agent.nodes.supervisor import supervisor_node
 
+load_dotenv()
+
 # --- GRAPH STATE DEFINITION ---
-# This tells LangGraph what data is being passed between nodes
 class AgentState(TypedDict):
-    # 'operator.add' ensures new messages are appended to the list, not overwritten
     messages: Annotated[Sequence, operator.add]
     next_node: str
 
 # --- THE GENERAL AGENT NODE ---
-# A simple LLM call for casual chat when OP.GG or Reddit aren't needed
 llm = ChatOllama(
     model="llama3.1", 
-    temperature=0.7, # A bit more creative for casual chat
+    temperature=0.7,
     base_url=os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 )
 
@@ -48,7 +41,7 @@ async def main():
     builder.add_node("Supervisor", supervisor_node)
     builder.add_node("GeneralAgent", general_agent_node)
     builder.add_node("OPGGWorker", opgg_worker_node)
-    builder.add_node("RedditWorker", reddit_worker_node)
+    builder.add_node("ResearchWorker", research_worker_node)
 
     # 1. Everything starts at the Supervisor
     builder.add_edge(START, "Supervisor")
@@ -64,7 +57,7 @@ async def main():
         {
             "GeneralAgent": "GeneralAgent",
             "OPGGWorker": "OPGGWorker",
-            "RedditWorker": "RedditWorker",
+            "ResearchWorker": "ResearchWorker",
             "FINISH": END
         }
     )
@@ -72,7 +65,7 @@ async def main():
     # 3. After a worker finishes, it must report back to the Supervisor
     builder.add_edge("GeneralAgent", END)
     builder.add_edge("OPGGWorker", END)
-    builder.add_edge("RedditWorker", END)
+    builder.add_edge("ResearchWorker", END)
 
     # 4. Add Memory (Checkpointer) so it remembers your lane!
     memory = MemorySaver()

@@ -1,4 +1,3 @@
-version: '3.8'
 services:
   agent-api:
     build: .
@@ -8,7 +7,12 @@ services:
       - .env
     volumes:
       - .:/app
+      # --- THE FIX: Anonymous Volumes ---
+      # This preserves the internal container folders 
+      # and prevents the host from overwriting them.
+      - /app/.venv
+      - /app/opgg-mcp/node_modules
+      - /app/opgg-mcp/dist
     restart: unless-stopped
-    # This allows the container to talk to your host machine's Ollama!
     extra_hosts:
       - "host.docker.internal:host-gateway"
