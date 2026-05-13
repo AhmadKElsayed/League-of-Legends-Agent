@@ -28,7 +28,6 @@ yarn-error.log*
 .npm
 
 # --- Docker ---
-# (Usually ignored in .dockerignore, but good to have here too)
 .docker/
 
 # --- OS & IDE ---
