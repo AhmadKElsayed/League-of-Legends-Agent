@@ -37,8 +37,4 @@ async def test_node_isolation():
         traceback.print_exc()
 
 if __name__ == "__main__":
-    # Ensure your OLLAMA_BASE_URL is set for the local test
-    if not os.getenv("OLLAMA_BASE_URL"):
-        os.environ["OLLAMA_BASE_URL"] = "http://localhost:11434"
-        
     asyncio.run(test_node_isolation())

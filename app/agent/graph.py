@@ -1,5 +1,6 @@
 from langgraph.graph import StateGraph, START, END
-from langgraph.checkpoint.memory import MemorySaver
+import sqlite3
+from langgraph.checkpoint.sqlite import SqliteSaver
 from app.agent.state import AgentState
 from app.agent.nodes.supervisor import supervisor_node
 from app.agent.nodes.research_worker import research_worker_node
@@ -37,8 +38,7 @@ def create_graph():
     workflow.add_edge("GeneralAgent", END)
     workflow.add_edge("OPGGWorker", END)
     workflow.add_edge("ResearchWorker", END)
+    return workflow
 
-    memory = MemorySaver()
-    return workflow.compile(checkpointer=memory)
-
-lol_agent = create_graph()
+workflow = create_graph()
+lol_agent = workflow.compile()

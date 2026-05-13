@@ -1,21 +1,21 @@
 import asyncio
 import os
 from langchain_core.messages import HumanMessage
-from app.agent.nodes.reddit_worker import reddit_worker_node
+from app.agent.nodes.research_worker import research_worker_node
 
-async def test_reddit_isolation():
-    print("🚀 Testing Reddit Worker Node in Isolation...")
+async def test_research_isolation():
+    print("🚀 Testing Research Worker Node in Isolation...")
 
-    # A typical prompt you'd send to the Reddit agent
+    # A typical prompt you'd send to the Research agent
     mock_state = {
         "messages": [
-            HumanMessage(content="What is the Reddit community saying about the current state of Darius in the Top Lane? Are people complaining he is too strong?")
+            HumanMessage(content="What is the community saying about the current state of Darius in the Top Lane? Are people complaining he is too strong?")
         ]
     }
 
     try:
-        print("--- Executing Reddit Node ---")
-        result = await reddit_worker_node(mock_state)
+        print("--- Executing Research Node ---")
+        result = await research_worker_node(mock_state)
 
         new_messages = result.get("messages", [])
         
@@ -35,7 +35,4 @@ async def test_reddit_isolation():
         traceback.print_exc()
 
 if __name__ == "__main__":
-    if not os.getenv("OLLAMA_BASE_URL"):
-        os.environ["OLLAMA_BASE_URL"] = "http://localhost:11434"
-        
-    asyncio.run(test_reddit_isolation())
+    asyncio.run(test_research_isolation())

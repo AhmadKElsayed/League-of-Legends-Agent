@@ -1,11 +1,10 @@
-# --- Environments & Secrets ---
+# Environments & Secrets
 .env
 .env.local
 .env.*
-# Keep an example file so others know what keys are needed
 !.env.example
 
-# --- Python / uv ---
+# Python / uv
 __pycache__/
 *.py[cod]
 *$py.class
@@ -17,8 +16,30 @@ ENV/
 .ruff_cache/
 .mypy_cache/
 .uv/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.flakes/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*,cover
+.hypothesis/
+.ipynb_checkpoints/
 
-# --- Node.js (For your OPGG MCP Server) ---
+# Node.js
 node_modules/
 dist/
 npm-debug.log*
@@ -26,14 +47,30 @@ yarn-debug.log*
 yarn-error.log*
 .eslintcache
 .npm
+out/
+.next/
+.cache/
 
-# --- Docker ---
+# Docker
 .docker/
 
-# --- OS & IDE ---
+# OS & IDE
 .DS_Store
 Thumbs.db
 .vscode/
 .idea/
 *.swp
 *.swo
+.project
+.pydevproject
+.settings/
+
+# Logs
+logs/
+*.log
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+

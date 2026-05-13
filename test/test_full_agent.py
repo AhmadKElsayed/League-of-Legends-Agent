@@ -3,7 +3,7 @@ import uuid
 import asyncio
 from dotenv import load_dotenv
 from langchain_core.messages import HumanMessage
-from langchain_ollama import ChatOllama
+from langchain_openrouter import ChatOpenRouter
 from langgraph.graph import StateGraph, START, END
 from langgraph.checkpoint.memory import MemorySaver
 import operator
@@ -20,10 +20,9 @@ class AgentState(TypedDict):
     next_node: str
 
 # --- THE GENERAL AGENT NODE ---
-llm = ChatOllama(
-    model="llama3.1", 
-    temperature=0.7,
-    base_url=os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+llm = ChatOpenRouter(
+    model="google/gemini-2.5-flash-lite", 
+    temperature=0.7
 )
 
 async def general_agent_node(state):
@@ -72,7 +71,6 @@ async def main():
     graph = builder.compile(checkpointer=memory)
 
     # --- INTERACTIVE CHAT LOOP ---
-    # We assign a static thread ID so the memory persists for this session
     config = {"configurable": {"thread_id": "blackwell_session_1"}}
     
     print("\n✅ Agent Online! Type 'exit' or 'quit' to stop.")

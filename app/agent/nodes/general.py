@@ -1,12 +1,11 @@
 import os
 from dotenv import load_dotenv
-from langchain_ollama import ChatOllama
-from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_openrouter import ChatOpenRouter
 from langchain_core.messages import SystemMessage
 
 load_dotenv()
 
-llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0.7)
+llm = ChatOpenRouter(model="deepseek/deepseek-v4-flash", temperature=0.4)
 
 # llm = ChatOllama(
 #     model="llama3.1", 

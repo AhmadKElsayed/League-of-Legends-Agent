@@ -88,7 +88,7 @@ export const proxyServer = async ({
     });
   }
 
-  server.setRequestHandler(CompleteRequestSchema, async (args) => {
-    return client.complete(args.params);
-  });
+  // server.setRequestHandler(CompleteRequestSchema, async (args) => {
+  //   return client.complete(args.params);
+  // });
 };

@@ -1,7 +1,6 @@
 import os
 import pathlib
-from langchain_ollama import ChatOllama
-from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_openrouter import ChatOpenRouter
 from langchain_core.messages import SystemMessage, ToolMessage, AIMessage
 from langchain_mcp_adapters.client import MultiServerMCPClient
 from langchain_mcp_adapters.tools import load_mcp_tools
@@ -9,12 +8,12 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0)
-llm = ChatOllama(
-    model="qwen2.5:72b", 
-    temperature=0.2,
-    base_url=os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
-)
+llm = ChatOpenRouter(model="deepseek/deepseek-v4-flash", temperature=0.2)
+# llm = ChatOllama(
+#     model="qwen2.5:72b", 
+#     temperature=0.2,
+#     base_url=os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+# )
 
 async def opgg_worker_node(state):
     # 1. Path logic
@@ -25,7 +24,7 @@ async def opgg_worker_node(state):
     opgg_server_path = next((p for p in possible_paths if p and pathlib.Path(p).exists()), None)
     
     if not opgg_server_path:
-        raise FileNotFoundError("Could not find opgg-mcp entry point.")
+        return {"messages": [AIMessage(content="⚠️ OPGG Worker Error: The MCP server entry point ('opgg-mcp/dist/index.js') was not found. If running locally, please run 'npm install && npm run build' inside the 'opgg-mcp' directory.", name="OPGGWorker")]}
 
     # 2. Supercharged Persona for Multi-Tool Use
     system_msg = SystemMessage(content="""You are the Ultimate League of Legends Analyst. 
@@ -62,6 +61,7 @@ async def opgg_worker_node(state):
         - REGION: If the user doesn't provide a region for a profile/match search, ASK them (e.g., KR, NA, EUW, EUNE).
         - DESIRED OUTPUT FIELDS: This is a CLOSED SET. You MUST read the tool description and only pick paths that exist (e.g., 'data.summary.average_stats.win_rate').
         - CASE SENSITIVITY: Use UPPER_SNAKE_CASE for champion names (e.g., 'LEE_SIN', 'DARIUS').
+        - POSITION: When a tool requires a position, you MUST use exactly one of these strings: "TOP", "JUNGLE", "MID", "ADC", "SUPPORT".
         """)
 
     node_name = "OP.GG hWorker"

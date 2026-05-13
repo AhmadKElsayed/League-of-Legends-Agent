@@ -1,23 +1,21 @@
 import os
 from dotenv import load_dotenv
-from langchain_ollama import ChatOllama
-from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_openrouter import ChatOpenRouter
 from langchain_core.messages import SystemMessage, ToolMessage, AIMessage
 from langchain_tavily import TavilySearch
 
 load_dotenv()
 
-# llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0)
-llm = ChatOllama(
-    model="qwen2.5:72b", 
-    temperature=0,
-    base_url=os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
-)
+llm = ChatOpenRouter(model="deepseek/deepseek-v4-flash", temperature=0.4)
+# llm = ChatOllama(
+#     model="qwen2.5:72b", 
+#     temperature=0,
+#     base_url=os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+# )
 
-tavily_tool = TavilySearch(max_results=5) # Increased results for better coverage
+tavily_tool = TavilySearch(max_results=5)
 
 async def research_worker_node(state):
-    # 1. ENHANCED PERSONA: Explicit instructions on multi-source synthesis
     system_msg = SystemMessage(content="""You are an Elite LoL Research Lead. 
     Your goal is to provide a 'Community Pulse' report.
     

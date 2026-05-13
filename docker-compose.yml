@@ -5,11 +5,12 @@ services:
       - "8000:8000"
     env_file:
       - .env
+    environment:
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
     volumes:
       - .:/app
-      # --- THE FIX: Anonymous Volumes ---
-      # This preserves the internal container folders 
-      # and prevents the host from overwriting them.
       - /app/.venv
       - /app/opgg-mcp/node_modules
       - /app/opgg-mcp/dist

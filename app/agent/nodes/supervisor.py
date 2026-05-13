@@ -1,16 +1,15 @@
 import os
-from langchain_ollama import ChatOllama
-from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_openrouter import ChatOpenRouter
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from pydantic import BaseModel
 from typing import Literal
 
-# llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0)
-llm = ChatOllama(
-    model="qwen2.5:72b", 
-    temperature=0,
-    base_url=os.getenv("OLLAMA_BASE_URL")
-)
+llm = ChatOpenRouter(model="deepseek/deepseek-v4-flash", temperature=0.1)
+# llm = ChatOllama(
+#     model="qwen2.5:72b", 
+#     temperature=0,
+#     base_url=os.getenv("OLLAMA_BASE_URL")
+# )
 
 class Router(BaseModel):
     next_node: Literal["FINISH", "GeneralAgent", "OPGGWorker", "ResearchWorker"]

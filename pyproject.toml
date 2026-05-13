@@ -9,7 +9,7 @@ description = "Agentic LoL Assistant using LangGraph, Gemini Flash, and MCP."
 requires-python = ">=3.10"
 dependencies = [
     "fastapi>=0.110.0",
-    "uvicorn>=0.29.0",
+    "uvicorn[standard]>=0.29.0",
     "langchain>=0.1.13",
     "langgraph>=0.0.30",
     "langchain-google-genai>=1.0.1",
@@ -18,7 +18,11 @@ dependencies = [
     "langchain-mcp-adapters>=0.2.2",
     "pydantic>=2.6.4",
     "python-dotenv>=1.0.1",
-    "langchain-ollama>=0.2.0"
+    "langchain-ollama>=0.2.0",
+    "langgraph-checkpoint-sqlite>=3.1.0",
+    "aiosqlite>=0.22.1",
+    "langchain-openai>=1.2.1",
+    "langchain-openrouter>=0.2.3",
 ]
 
 [tool.hatch.build.targets.wheel]

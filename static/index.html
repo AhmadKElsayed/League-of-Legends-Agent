@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>League of Legends Agent</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="app-container">
+        <!-- Sidebar for Sessions -->
+        <aside id="sidebar">
+            <div class="sidebar-header">
+                <h2>Hextech Agent</h2>
+                <button id="new-chat-btn" title="New Chat">
+                    <span>+</span> New Chat
+                </button>
+            </div>
+            <div id="session-list" class="session-list">
+                <!-- Sessions populated via JS -->
+            </div>
+        </aside>
+
+        <!-- Main Chat Area -->
+        <main id="chat-area">
+            <header class="chat-header">
+                <h3 id="current-chat-title">Select a chat or start a new one</h3>
+            </header>
+            
+            <div id="chat-messages" class="chat-messages">
+                <!-- Chat bubbles go here -->
+            </div>
+            
+            <div class="chat-input-container">
+                <input type="text" id="chat-input" placeholder="Ask about champions, meta, profiles..." autocomplete="off" disabled>
+                <button id="send-btn" disabled>Send</button>
+            </div>
+        </main>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
