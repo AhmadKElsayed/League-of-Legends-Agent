@@ -6,13 +6,13 @@ from langchain_core.messages import SystemMessage
 
 load_dotenv()
 
-# llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0.7)
+llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0.7)
 
-llm = ChatOllama(
-    model="llama3.1", 
-    temperature=0,
-    base_url=os.getenv("OLLAMA_BASE_URL")
-)
+# llm = ChatOllama(
+#     model="llama3.1", 
+#     temperature=0,
+#     base_url=os.getenv("OLLAMA_BASE_URL")
+# )
 
 def general_agent_node(state):
     system_message = SystemMessage(
