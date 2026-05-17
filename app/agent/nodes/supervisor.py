@@ -3,6 +3,7 @@ from langchain_openrouter import ChatOpenRouter
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from pydantic import BaseModel
 from typing import Literal
+from app.agent_logger import log_node_transition
 
 llm = ChatOpenRouter(model="deepseek/deepseek-v4-flash", temperature=0.0)
 
@@ -44,4 +45,5 @@ supervisor_chain = prompt | llm.with_structured_output(Router)
 
 def supervisor_node(state):
     decision = supervisor_chain.invoke({"messages": state["messages"]})
+    log_node_transition("Supervisor", decision.next_node)
     return {"next_node": decision.next_node}

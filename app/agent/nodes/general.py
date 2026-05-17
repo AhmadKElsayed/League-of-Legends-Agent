@@ -38,6 +38,8 @@ You are **Nexus**, a charismatic League of Legends companion.
 - Keep it scannable — no walls of text.
 """
 
+from app.agent_logger import log_llm_response
+
 def general_agent_node(state):
     system_message = SystemMessage(content=SYSTEM_PROMPT)
     
@@ -45,4 +47,5 @@ def general_agent_node(state):
     messages = [system_message] + list(state["messages"])
     
     response = llm.invoke(messages)
+    log_llm_response("GeneralAgent", response)
     return {"messages": [response]}

@@ -3,6 +3,7 @@ from dotenv import load_dotenv
 from langchain_openrouter import ChatOpenRouter
 from langchain_core.messages import SystemMessage, ToolMessage, AIMessage
 from langchain_tavily import TavilySearch
+from app.agent_logger import log_llm_response, log_tool_result
 
 load_dotenv()
 
@@ -66,29 +67,32 @@ _List 2-3 of the most relevant sources with brief descriptions of what they cont
     node_name = "ResearchWorker"
     
     # 2. THE ADVANCED REASONING LOOP
-    max_retries = 3
+    max_retries = 5
     attempts = 0
     new_messages = []
 
     agent_with_tools = llm.bind_tools([tavily_tool])
 
     while attempts < max_retries:
-        # Acknowledge the thinking process
-        response = await agent_with_tools.ainvoke(messages)
+        # If we are at the last attempt, unbind tools to force a final text response
+        if attempts == max_retries - 1:
+            response = await llm.ainvoke(messages)
+        else:
+            response = await agent_with_tools.ainvoke(messages)
         
         # Tag the AIMessage immediately
         if isinstance(response, AIMessage):
             response.name = node_name
             
         new_messages.append(response)
+        log_llm_response(node_name, response)
 
         if not response.tool_calls:
             break
 
         messages.append(response)
         
-        # Parallel Execution handling (if the LLM generates multiple tool calls at once)
-        tool_results_found = False
+        # Execute tool calls
         for tool_call in response.tool_calls:
             try:
                 # Execution
@@ -97,8 +101,6 @@ _List 2-3 of the most relevant sources with brief descriptions of what they cont
 
                 if content == "[]" or not content:
                     content = f"The query '{tool_call['args'].get('query')}' yielded no results. Please try a more specific LoL-related query."
-                else:
-                    tool_results_found = True
 
             except Exception as e:
                 content = f"Search Error: {str(e)}. Attempting to recover..."
@@ -106,16 +108,9 @@ _List 2-3 of the most relevant sources with brief descriptions of what they cont
             t_msg = ToolMessage(content=content, name=tool_call["name"], tool_call_id=tool_call["id"])
             messages.append(t_msg)
             new_messages.append(t_msg)
+            log_tool_result(node_name, tool_call["name"], tool_call["id"], content)
 
-        # If we got valid data, do a final synthesis
-        if tool_results_found:
-            final_report = await agent_with_tools.ainvoke(messages)
-            if isinstance(final_report, AIMessage):
-                final_report.name = node_name
-            new_messages.append(final_report)
-            break
-            
         attempts += 1
-        print(f"🔄 {node_name} is pivoting search strategy (Attempt {attempts}/{max_retries})")
+        print(f"🔄 {node_name} completed step {attempts}/{max_retries}")
 
     return {"messages": new_messages}

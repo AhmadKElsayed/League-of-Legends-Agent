@@ -11,6 +11,7 @@ from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from app.agent.graph import workflow, lol_agent
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from dotenv import load_dotenv
+from app.agent_logger import log_session_header, log_session_footer
 
 load_dotenv()
 
@@ -103,7 +104,7 @@ class ChatResponse(BaseModel):
 
 @app.post("/chat", response_model=ChatResponse)
 async def chat_endpoint(request: ChatRequest):
-    logger.info(f"Session {request.thread_id} - New Message: {request.message}")
+    log_session_header(request.thread_id, request.message)
     initial_state = {"messages": [HumanMessage(content=request.message)]}
     config = {"configurable": {"thread_id": request.thread_id}}
     
@@ -117,7 +118,7 @@ async def chat_endpoint(request: ChatRequest):
             text_parts = [part.get("text", "") for part in final_message if isinstance(part, dict) and part.get("type") == "text"]
             final_message = "\n".join(text_parts)
             
-        logger.info(f"Session {request.thread_id} - Agent Reply: {str(final_message)[:100]}...")
+        log_session_footer(request.thread_id, str(final_message))
         return ChatResponse(response=str(final_message))
         
     except Exception as e:
@@ -198,8 +199,7 @@ async def delete_session(thread_id: str):
     try:
         if db_conn:
             await db_conn.execute("DELETE FROM checkpoints WHERE thread_id = ?", (thread_id,))
-            await db_conn.execute("DELETE FROM checkpoint_blobs WHERE thread_id = ?", (thread_id,))
-            await db_conn.execute("DELETE FROM checkpoint_writes WHERE thread_id = ?", (thread_id,))
+            await db_conn.execute("DELETE FROM writes WHERE thread_id = ?", (thread_id,))
             await db_conn.commit()
             return {"status": "success"}
         else:

@@ -5,6 +5,7 @@ from langchain_core.messages import SystemMessage, ToolMessage, AIMessage
 from langchain_mcp_adapters.client import MultiServerMCPClient
 from langchain_mcp_adapters.tools import load_mcp_tools
 from dotenv import load_dotenv
+from app.agent_logger import log_llm_response, log_tool_result
 
 load_dotenv()
 
@@ -109,6 +110,7 @@ Your job is to retrieve accurate data using your OPGG tools and present it in a 
                 response.name = "OPGGWorker"
             
             new_messages.append(response)
+            log_llm_response(node_name, response)
             
             if not response.tool_calls:
                 break
@@ -129,12 +131,15 @@ Your job is to retrieve accurate data using your OPGG tools and present it in a 
                 tool_msg = ToolMessage(content=content, name=tool_call["name"], tool_call_id=tool_call["id"])
                 messages.append(tool_msg)
                 new_messages.append(tool_msg)
+                log_tool_result(node_name, tool_call["name"], tool_call["id"], content)
                 
-            if not tool_execution_failed:
-                final_response = await agent_with_tools.ainvoke(messages)
+            # If this is the last attempt and we executed tool calls, we must do a final text synthesis
+            if attempts + 1 == max_retries:
+                final_response = await llm.ainvoke(messages)
                 if isinstance(final_response, AIMessage):
                     final_response.name = node_name
                 new_messages.append(final_response)
+                log_llm_response(node_name, final_response)
                 break
                 
             attempts += 1
