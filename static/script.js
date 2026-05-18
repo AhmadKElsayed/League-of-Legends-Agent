@@ -9,14 +9,14 @@ let activeTypewriterResolve = null;
 
 // Riot DDragon high-resolution champion splash image mapping
 const splashImages = {
-    ryze: 'https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Ryze_11.jpg', // Championship Ryze
-    aurelion: 'https://ddragon.leagueoflegends.com/cdn/img/champion/splash/AurelionSol_0.jpg', // Cosmic Core Base
-    jinx: 'https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Jinx_0.jpg', // Slayer Jinx
-    ahri: 'https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Ahri_0.jpg', // Spirit Blossom Ahri
-    yasuo: 'https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Yasuo_0.jpg', // PROJECT Yasuo
-    lux: 'https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Lux_17.jpg', // Dark Cosmic Lux
-    senna: 'https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Senna_0.jpg', // Base Senna
-    pantheon: 'https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Pantheon_0.jpg', // Pulsefire Pantheon
+    ryze: 'https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Ryze_11.jpg',
+    aurelion: 'https://ddragon.leagueoflegends.com/cdn/img/champion/splash/AurelionSol_0.jpg',
+    jinx: 'https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Jinx_0.jpg',
+    ahri: 'https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Ahri_0.jpg',
+    yasuo: 'https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Yasuo_0.jpg',
+    lux: 'https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Lux_17.jpg',
+    senna: 'https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Senna_0.jpg',
+    pantheon: 'https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Pantheon_0.jpg',
     zed: 'https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Zed_0.jpg',
     akali: 'https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Akali_0.jpg',
     ekko: 'https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Ekko_0.jpg',
@@ -141,7 +141,7 @@ function changeBackground(champKey) {
 
 function startSplashRotation() {
     if (splashRotationInterval) clearInterval(splashRotationInterval);
-    
+
     // Cycle backgrounds every 12 seconds with absolute cross-fade precision
     splashRotationInterval = setInterval(() => {
         currentSplashIndex = (currentSplashIndex + 1) % splashKeys.length;
