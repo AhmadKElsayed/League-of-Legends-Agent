@@ -19,7 +19,13 @@ const splashImages = {
     pantheon: 'https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Pantheon_0.jpg', // Pulsefire Pantheon
     zed: 'https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Zed_0.jpg',
     akali: 'https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Akali_0.jpg',
-    ekko: 'https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Ekko_0.jpg'
+    ekko: 'https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Ekko_0.jpg',
+    diana: 'https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Diana_0.jpg',
+    sylas: 'https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Sylas_0.jpg',
+    leona: 'https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Leona_0.jpg',
+    azir: 'https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Azir_0.jpg',
+    leesin: 'https://ddragon.leagueoflegends.com/cdn/img/champion/splash/LeeSin_0.jpg',
+    thresh: 'https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Thresh_0.jpg'
 };
 
 const splashKeys = Object.keys(splashImages);
@@ -107,7 +113,13 @@ function changeBackground(champKey) {
         pantheon: 'Pantheon',
         zed: 'Zed',
         akali: 'Akali',
-        ekko: 'Ekko'
+        ekko: 'Ekko',
+        diana: 'Diana',
+        sylas: 'Sylas',
+        leona: 'Leona',
+        azir: 'Azir',
+        leesin: 'Lee Sin',
+        thresh: 'Thresh'
     };
 
     if (activeBgName) {
