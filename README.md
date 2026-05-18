@@ -1,6 +1,10 @@
 # 🎮 League of Legends Agentic AI
 
-A multi-agent system that provides real-time League of Legends analytics, meta-research, and player insights through a chat interface. Powered by **LangGraph**, **DeepSeek V4 Flash** (via OpenRouter), and the **Model Context Protocol (MCP)**.
+A multi-agent system that provides real-time League of Legends analytics, meta-research, and player insights through a chat interface. Powered by **LangGraph**, **Google Gemini 2.5 Flash** (via OpenRouter), and the **Model Context Protocol (MCP)**.
+
+<p align="center">
+  <img src="assets/dashboard.png" alt="Hextech Intelligence Console Dashboard" width="850" style="border-radius: 8px; border: 1.5px solid #c89b3c; box-shadow: 0 6px 30px rgba(0,0,0,0.6);">
+</p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/Python-3.13-blue?logo=python&logoColor=white" alt="Python">
@@ -49,7 +53,7 @@ graph TD
 
 | Layer | Technology |
 |---|---|
-| **LLM** | DeepSeek V4 Flash via [OpenRouter](https://openrouter.ai/) |
+| **LLM** | Google Gemini 2.5 Flash via [OpenRouter](https://openrouter.ai/) |
 | **Orchestration** | [LangGraph](https://github.com/langchain-ai/langgraph) (multi-agent state machine) |
 | **API** | FastAPI + Uvicorn |
 | **Frontend** | Vanilla HTML/CSS/JS chat UI with session management |
