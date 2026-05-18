@@ -1,22 +1,47 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>League of Legends Agent</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <title>Hextech Intelligence Console - LoL Agent</title>
+    <!-- Google Fonts: Cinzel for premium League fantasy headers, Inter for readable body text -->
+    <link
+        href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;900&family=Inter:wght@300;400;500;600;700&display=swap"
+        rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
+
 <body>
+    <!-- Hardware accelerated smooth background splash layers for flicker-free crossfades -->
+    <div id="bg-layer-1" class="bg-layer active"></div>
+    <div id="bg-layer-2" class="bg-layer"></div>
+
+    <!-- Deep Hextech dark blue blur overlay -->
+    <div id="overlay"></div>
+
+    <!-- Interactive magical particle canvas -->
+    <canvas id="particles-canvas"></canvas>
+
     <div id="app-container">
         <!-- Sidebar for Sessions -->
         <aside id="sidebar">
             <div class="sidebar-header">
-                <h2>Hextech Agent</h2>
+                <div class="brand">
+                    <div class="hextech-mini-core"></div>
+                    <h2>Hextech Agent</h2>
+                </div>
                 <button id="new-chat-btn" title="New Chat">
-                    <span>+</span> New Chat
+                    <span class="plus-icon">+</span> New Chat
                 </button>
             </div>
+
+            <!-- Real-time search/filter for chat histories -->
+            <div class="search-container">
+                <span class="search-icon">🔍</span>
+                <input type="text" id="session-search" placeholder="Search archives..." autocomplete="off">
+            </div>
+
             <div id="session-list" class="session-list">
                 <!-- Sessions populated via JS -->
             </div>
@@ -25,21 +50,115 @@
         <!-- Main Chat Area -->
         <main id="chat-area">
             <header class="chat-header">
-                <h3 id="current-chat-title">Select a chat or start a new one</h3>
+                <div class="header-left">
+                    <button id="sidebar-toggle" class="sidebar-toggle-btn" title="Toggle Archive Sidebar">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </button>
+                    <div class="title-container">
+                        <h3 id="current-chat-title" title="Double click to rename">Select a chat or start a new one</h3>
+                        <button id="rename-chat-btn" title="Rename Session" style="display: none;">✏️</button>
+                    </div>
+                </div>
+
+                <!-- Live Progressive Agent Terminal Logs -->
+                <div id="thinking-bar" class="thinking-bar" style="display: none;">
+                    <span class="thinking-pulse"></span>
+                    <span id="thinking-status">Interfacing with Runeterra Archive...</span>
+                </div>
+
+                <div class="header-actions">
+                    <!-- Background Splash Picker -->
+                    <div class="header-control wallpaper-control" title="Change Background Splash">
+                        <span class="control-icon">🖼️</span>
+                        <select id="bg-selector">
+                            <option value="ryze">Ryze</option>
+                            <option value="aurelion">Aurelion Sol</option>
+                            <option value="jinx">Jinx</option>
+                            <option value="ahri">Ahri</option>
+                            <option value="yasuo">Yasuo</option>
+                            <option value="lux">Lux</option>
+                            <option value="senna">Senna</option>
+                            <option value="pantheon">Pantheon</option>
+                            <option value="zed">Zed</option>
+                            <option value="akali">Akali</option>
+                            <option value="ekko">Ekko</option>
+                        </select>
+                    </div>
+
+                    <!-- Web Audio synthesized sound toggle -->
+                    <button id="sound-toggle" class="header-control-btn" title="Toggle synthesized client SFX">
+                        <span class="sound-icon">🔈</span> Sound Off
+                    </button>
+
+                    <!-- Particle system matrix toggle -->
+                    <button id="particles-toggle" class="header-control-btn active"
+                        title="Toggle background particle canvas">
+                        <span class="particles-icon">✨</span> Matrix On
+                    </button>
+                </div>
             </header>
-            
+
             <div id="chat-messages" class="chat-messages">
-                <!-- Chat bubbles go here -->
+                <!-- Landing view is populated here when there are no messages -->
+                <div id="landing-view" class="landing-view">
+                    <div class="hextech-core-container">
+                        <div class="hextech-core-outer"></div>
+                        <div class="hextech-core-inner"></div>
+                        <div class="hextech-core-center"></div>
+                    </div>
+                    <h1 class="landing-title">Hextech Intelligence Console</h1>
+                    <p class="landing-subtitle">Welcome, Summoner. Powered by Runeterra Core and OP.GG match analytics.
+                        Select a query matrix or write your own.</p>
+
+                    <div class="starter-chips-container">
+                        <div class="starter-chip"
+                            data-query="What is the best build and skill order for Jinx in the current patch?">
+                            <span class="chip-emoji">⚔️</span>
+                            <div class="chip-content">
+                                <span class="chip-title">Combat Build</span>
+                                <span class="chip-desc">Optimize Jinx runes and items</span>
+                            </div>
+                        </div>
+                        <div class="starter-chip"
+                            data-query="How does Kayle survive the early lane matchup against Jax?">
+                            <span class="chip-emoji">🛡️</span>
+                            <div class="chip-content">
+                                <span class="chip-title">Matchup Strategy</span>
+                                <span class="chip-desc">Kayle vs Jax lane tactics</span>
+                            </div>
+                        </div>
+                        <div class="starter-chip"
+                            data-query="Explain the lore relationship between Aurelion Sol and the Targonian Aspect of War.">
+                            <span class="chip-emoji">📜</span>
+                            <div class="chip-content">
+                                <span class="chip-title">Runeterra Lore</span>
+                                <span class="chip-desc">Aurelion Sol's cosmic history</span>
+                            </div>
+                        </div>
+                        <div class="starter-chip"
+                            data-query="Who are the current S-tier Midlaners and what makes them strong in the meta?">
+                            <span class="chip-emoji">📈</span>
+                            <div class="chip-content">
+                                <span class="chip-title">Meta Analytics</span>
+                                <span class="chip-desc">Find top-tier mid pick rates</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
-            
+
             <div class="chat-input-container">
-                <input type="text" id="chat-input" placeholder="Ask about champions, meta, profiles..." autocomplete="off" disabled>
+                <input type="text" id="chat-input" placeholder="Query Runeterra archives or OP.GG profiles..."
+                    autocomplete="off" disabled>
                 <button id="send-btn" disabled>Send</button>
             </div>
         </main>
     </div>
-    
+
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="script.js"></script>
 </body>
+
 </html>
