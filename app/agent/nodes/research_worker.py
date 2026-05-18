@@ -7,7 +7,7 @@ from app.agent_logger import log_llm_response, log_tool_result
 
 load_dotenv()
 
-llm = ChatOpenRouter(model="deepseek/deepseek-v4-flash", temperature=0.5)
+llm = ChatOpenRouter(model="google/gemini-2.5-flash", temperature=0.5, max_tokens=8000)
 # llm = ChatOllama(
 #     model="qwen2.5:72b", 
 #     temperature=0,

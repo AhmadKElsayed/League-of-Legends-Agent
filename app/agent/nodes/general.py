@@ -5,7 +5,7 @@ from langchain_core.messages import SystemMessage
 
 load_dotenv()
 
-llm = ChatOpenRouter(model="deepseek/deepseek-v4-flash", temperature=0.4)
+llm = ChatOpenRouter(model="google/gemini-2.5-flash", temperature=0.4, max_tokens=2000)
 
 # llm = ChatOllama(
 #     model="llama3.1", 

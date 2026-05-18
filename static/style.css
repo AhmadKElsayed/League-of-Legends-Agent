@@ -62,13 +62,11 @@ body {
   background-repeat: no-repeat;
   z-index: -3;
   opacity: 0;
-  transform: scale(1.05);
-  transition: opacity 1.2s ease-in-out, transform 10s ease-out;
+  transition: opacity 1.2s ease-in-out;
 }
 
 .bg-layer.active {
   opacity: 1;
-  transform: scale(1);
 }
 
 #overlay {
@@ -441,31 +439,23 @@ body {
   align-items: center;
   background: rgba(0, 0, 0, 0.5);
   border: 1px solid rgba(200, 155, 60, 0.25);
-  padding: 4px 8px;
-  gap: 6px;
+  padding: 4px 10px;
+  gap: 8px;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.4);
 }
 
 .control-icon {
   font-size: 0.9rem;
 }
 
-.header-control select {
-  background: transparent;
-  border: none;
+.active-bg-name {
   color: var(--hextech-gold-hover);
-  font-family: 'Inter', sans-serif;
-  font-size: 0.85rem;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.header-control select:focus {
-  outline: none;
-}
-
-.header-control select option {
-  background: var(--darker-blue);
-  color: var(--text-primary);
+  font-family: 'Cinzel', serif;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  text-shadow: 0 0 6px var(--hextech-gold-glowing);
 }
 
 .header-control-btn {
@@ -1006,4 +996,137 @@ body {
     max-width: 90%;
     padding: 12px 16px;
   }
+}
+
+/* --- CUSTOM HEXTECH MODAL OVERLAY --- */
+.custom-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(1, 10, 19, 0.85);
+  backdrop-filter: blur(8px);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+.custom-modal-overlay.active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.custom-modal-content {
+  background: var(--dark-blue);
+  border: 1px solid var(--hextech-gold);
+  box-shadow: 0 0 30px var(--hextech-gold-glowing), inset 0 0 15px rgba(200, 155, 60, 0.15);
+  width: 90%;
+  max-width: 420px;
+  padding: 24px;
+  text-align: center;
+  transform: scale(0.9);
+  transition: transform 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.1);
+}
+
+.custom-modal-overlay.active .custom-modal-content {
+  transform: scale(1);
+}
+
+.modal-title {
+  font-family: 'Cinzel', serif;
+  color: var(--hextech-gold-hover);
+  font-size: 1.2rem;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  margin-bottom: 12px;
+  text-shadow: 0 0 8px var(--hextech-gold-glowing);
+}
+
+.modal-desc {
+  font-family: 'Inter', sans-serif;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  line-height: 1.5;
+  margin-bottom: 24px;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+}
+
+.modal-btn {
+  font-family: 'Cinzel', serif;
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 1px;
+  padding: 8px 24px;
+  cursor: pointer;
+  background: transparent;
+  transition: all var(--transition-speed) ease;
+}
+
+.confirm-btn {
+  border: 1px solid #ff5252;
+  color: #ff5252;
+}
+
+.confirm-btn:hover {
+  background: rgba(255, 82, 82, 0.1);
+  box-shadow: 0 0 12px rgba(255, 82, 82, 0.4);
+}
+
+.cancel-btn {
+  border: 1px solid var(--hextech-gold);
+  color: var(--hextech-gold);
+}
+
+.cancel-btn:hover {
+  background: var(--hextech-gold-faint);
+  box-shadow: 0 0 12px var(--hextech-gold-glowing);
+  color: var(--hextech-gold-hover);
+}
+
+/* --- CUSTOM SNAPPY HEXTECH TOAST --- */
+.custom-toast {
+  position: fixed;
+  bottom: 40px;
+  left: 50%;
+  transform: translateX(-50%) translateY(100px);
+  background: rgba(1, 10, 19, 0.95);
+  border: 1px solid var(--hextech-blue);
+  box-shadow: 0 0 20px var(--hextech-blue-glowing);
+  padding: 12px 24px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  z-index: 10000;
+  opacity: 0;
+  pointer-events: none;
+  transition: all 0.12s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+.custom-toast.active {
+  transform: translateX(-50%) translateY(0);
+  opacity: 1;
+}
+
+.toast-icon {
+  font-size: 1.1rem;
+  color: var(--hextech-blue);
+  text-shadow: 0 0 5px var(--hextech-blue);
+}
+
+.toast-message {
+  font-family: 'Cinzel', serif;
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  color: var(--text-primary);
 }

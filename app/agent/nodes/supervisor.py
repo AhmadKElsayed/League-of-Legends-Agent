@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from typing import Literal
 from app.agent_logger import log_node_transition
 
-llm = ChatOpenRouter(model="deepseek/deepseek-v4-flash", temperature=0.0)
+llm = ChatOpenRouter(model="google/gemini-2.5-flash", temperature=0.0, max_tokens=1000)
 
 class Router(BaseModel):
     next_node: Literal["FINISH", "GeneralAgent", "OPGGWorker", "ResearchWorker"]

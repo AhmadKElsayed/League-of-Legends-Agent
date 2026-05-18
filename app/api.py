@@ -135,8 +135,8 @@ async def get_sessions():
         conn = sqlite3.connect("memory.db")
         cursor = conn.cursor()
         
-        # Extract thread IDs
-        cursor.execute("SELECT DISTINCT thread_id FROM checkpoints")
+        # Extract thread IDs sorted by recency
+        cursor.execute("SELECT thread_id FROM checkpoints GROUP BY thread_id ORDER BY max(rowid) DESC")
         rows = cursor.fetchall()
         
         sessions = []

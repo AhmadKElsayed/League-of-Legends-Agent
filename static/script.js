@@ -3,7 +3,6 @@
  * --------------------------------------------------------------------------- */
 
 let currentThreadId = null;
-let soundEnabled = false; // Web standards require user gesture to enable audio
 let matrixEnabled = true;
 let typewriterInterval = null;
 let activeTypewriterResolve = null;
@@ -23,6 +22,10 @@ const splashImages = {
     ekko: 'https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Ekko_0.jpg'
 };
 
+const splashKeys = Object.keys(splashImages);
+let currentSplashIndex = 0;
+let splashRotationInterval = null;
+
 // Global Sessions store for real-time local search
 let cachedSessions = [];
 
@@ -36,11 +39,10 @@ const currentChatTitle = document.getElementById('current-chat-title');
 const renameChatBtn = document.getElementById('rename-chat-btn');
 const sessionSearch = document.getElementById('session-search');
 
-const bgSelector = document.getElementById('bg-selector');
+const activeBgName = document.getElementById('active-bg-name');
 const bgLayer1 = document.getElementById('bg-layer-1');
 const bgLayer2 = document.getElementById('bg-layer-2');
 
-const soundToggle = document.getElementById('sound-toggle');
 const particlesToggle = document.getElementById('particles-toggle');
 const sidebarToggle = document.getElementById('sidebar-toggle');
 const sidebar = document.getElementById('sidebar');
@@ -48,13 +50,11 @@ const sidebar = document.getElementById('sidebar');
 const thinkingBar = document.getElementById('thinking-bar');
 const thinkingStatus = document.getElementById('thinking-status');
 
-// Web Audio API Context (Lazily Initialized)
-let audioCtx = null;
-
 // Initialize
 async function init() {
-    // Set initial background image
+    // Set initial background image and begin rotation cycle
     changeBackground('ryze');
+    startSplashRotation();
 
     // Fetch initial sessions
     await fetchSessions();
@@ -66,19 +66,11 @@ async function init() {
     });
     newChatBtn.addEventListener('click', createNewChat);
 
-    // Header controls
-    bgSelector.addEventListener('change', (e) => {
-        changeBackground(e.target.value);
-        playSound('click');
-    });
-
-    soundToggle.addEventListener('click', toggleSound);
     particlesToggle.addEventListener('click', toggleParticles);
 
     // Collapsible Mobile Sidebar
     sidebarToggle.addEventListener('click', () => {
         sidebar.classList.toggle('open');
-        playSound('click');
     });
 
     // Session Search Filter
@@ -93,131 +85,34 @@ async function init() {
     // Document-level clicks to skip typewriter
     document.addEventListener('click', skipTypewriter);
 
-    // Set up dynamic hover SFX on hextech interactive nodes
-    setupHoverSoundEffects();
-
     // Initialize Particles Canvas Matrix
     initParticlesCanvas();
 }
 
 // ---------------------------------------------------------------------------
-// Synthesized Client Sound Effects (Web Audio API Engine)
-// ---------------------------------------------------------------------------
-function initAudioContext() {
-    if (!audioCtx) {
-        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    }
-}
-
-function playSound(type) {
-    if (!soundEnabled) return;
-    try {
-        initAudioContext();
-        const now = audioCtx.currentTime;
-
-        const osc = audioCtx.createOscillator();
-        const gain = audioCtx.createGain();
-        osc.connect(gain);
-        gain.connect(audioCtx.destination);
-
-        if (type === 'click') {
-            // Serious, heavy metallic lock/switch thud
-            osc.type = 'triangle';
-            osc.frequency.setValueAtTime(220, now);
-            osc.frequency.linearRampToValueAtTime(100, now + 0.12);
-            gain.gain.setValueAtTime(0.12, now);
-            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
-            osc.start(now);
-            osc.stop(now + 0.12);
-        }
-        else if (type === 'hover') {
-            // Ultra-soft, low-frequency tactile vibration
-            osc.type = 'sine';
-            osc.frequency.setValueAtTime(180, now);
-            osc.frequency.linearRampToValueAtTime(140, now + 0.06);
-            gain.gain.setValueAtTime(0.015, now);
-            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.06);
-            osc.start(now);
-            osc.stop(now + 0.06);
-        }
-        else if (type === 'send') {
-            // Deep, heavy dynamic shockwave pulse
-            osc.type = 'triangle';
-            osc.frequency.setValueAtTime(320, now);
-            osc.frequency.exponentialRampToValueAtTime(60, now + 0.25);
-            gain.gain.setValueAtTime(0.14, now);
-            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
-            osc.start(now);
-            osc.stop(now + 0.25);
-        }
-        else if (type === 'receive') {
-            // Epic, deep resonant minor-third crystal chimes
-            const osc2 = audioCtx.createOscillator();
-            const gain2 = audioCtx.createGain();
-            osc2.connect(gain2);
-            gain2.connect(audioCtx.destination);
-
-            osc.type = 'triangle';
-            osc.frequency.setValueAtTime(146.83, now); // D3 low resonance
-            osc.frequency.exponentialRampToValueAtTime(110.00, now + 0.45); // A2 sub
-            gain.gain.setValueAtTime(0.08, now);
-            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
-
-            osc2.type = 'sine';
-            osc2.frequency.setValueAtTime(220.00, now); // A3 harmonic
-            osc2.frequency.exponentialRampToValueAtTime(293.66, now + 0.38); // D4 chime
-            gain2.gain.setValueAtTime(0.04, now);
-            gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.38);
-
-            osc.start(now);
-            osc.stop(now + 0.45);
-            osc2.start(now);
-            osc2.stop(now + 0.38);
-        }
-    } catch (e) {
-        console.warn("Synthesizer error or user block: ", e);
-    }
-}
-
-function toggleSound() {
-    soundEnabled = !soundEnabled;
-    if (soundEnabled) {
-        initAudioContext();
-        soundToggle.classList.add('active');
-        soundToggle.innerHTML = '<span class="sound-icon">🔊</span> Sound On';
-        playSound('click');
-    } else {
-        soundToggle.classList.remove('active');
-        soundToggle.innerHTML = '<span class="sound-icon">🔈</span> Sound Off';
-    }
-}
-
-function setupHoverSoundEffects() {
-    const attachSounds = () => {
-        const triggers = document.querySelectorAll('#new-chat-btn, .starter-chip, .session-item, .header-control-btn, .header-control, #send-btn, .delete-btn');
-        triggers.forEach(el => {
-            if (!el.dataset.soundHooked) {
-                el.addEventListener('mouseenter', () => playSound('hover'));
-                el.addEventListener('click', () => playSound('click'));
-                el.dataset.soundHooked = 'true';
-            }
-        });
-    };
-
-    // Initial run
-    attachSounds();
-
-    // Observe DOM changes to dynamically attach sound on newly created elements
-    const observer = new MutationObserver(attachSounds);
-    observer.observe(document.body, { childList: true, subtree: true });
-}
-
-// ---------------------------------------------------------------------------
-// Hardware Accelerated Cinematic Splash Background Fader
+// Hardware Accelerated Cinematic Splash Background Fader & Rotation
 // ---------------------------------------------------------------------------
 let currentBgLayer = 1;
 function changeBackground(champKey) {
     const url = splashImages[champKey] || splashImages.ryze;
+
+    const nameMap = {
+        ryze: 'Ryze',
+        aurelion: 'Aurelion Sol',
+        jinx: 'Jinx',
+        ahri: 'Ahri',
+        yasuo: 'Yasuo',
+        lux: 'Lux',
+        senna: 'Senna',
+        pantheon: 'Pantheon',
+        zed: 'Zed',
+        akali: 'Akali',
+        ekko: 'Ekko'
+    };
+
+    if (activeBgName) {
+        activeBgName.textContent = nameMap[champKey] || champKey;
+    }
 
     if (currentBgLayer === 1) {
         bgLayer2.style.backgroundImage = `url('${url}')`;
@@ -230,6 +125,16 @@ function changeBackground(champKey) {
         bgLayer2.classList.remove('active');
         currentBgLayer = 1;
     }
+}
+
+function startSplashRotation() {
+    if (splashRotationInterval) clearInterval(splashRotationInterval);
+    
+    // Cycle backgrounds every 12 seconds with absolute cross-fade precision
+    splashRotationInterval = setInterval(() => {
+        currentSplashIndex = (currentSplashIndex + 1) % splashKeys.length;
+        changeBackground(splashKeys[currentSplashIndex]);
+    }, 12000);
 }
 
 // ---------------------------------------------------------------------------
@@ -247,7 +152,6 @@ function renameActiveSession() {
         localStorage.setItem(`session_title_${currentThreadId}`, sanitized);
         currentChatTitle.textContent = sanitized;
 
-        playSound('click');
         // Redraw lists
         renderSessions(cachedSessions);
     }
@@ -315,7 +219,6 @@ function renderSessions(sessions) {
             const newName = prompt("Rename archives:", originalName);
             if (newName && newName.trim()) {
                 localStorage.setItem(`session_title_${session.thread_id}`, newName.trim());
-                playSound('click');
                 fetchSessions();
                 if (currentThreadId === session.thread_id) {
                     currentChatTitle.textContent = newName.trim();
@@ -368,7 +271,6 @@ function createNewChat() {
     document.querySelectorAll('.session-item').forEach(el => el.classList.remove('active'));
 
     chatInput.focus();
-    playSound('click');
 }
 
 async function loadSession(threadId) {
@@ -594,9 +496,6 @@ async function sendMessage() {
     const text = chatInput.value.trim();
     if (!text || !currentThreadId) return;
 
-    // Trigger hover/click synthetic sound
-    playSound('send');
-
     // UI Updates
     chatInput.value = '';
     chatInput.disabled = true;
@@ -627,9 +526,6 @@ async function sendMessage() {
         loadingDiv.remove();
         stopThinkingProgress();
 
-        // Play reply arrival synthesized chime
-        playSound('receive');
-
         // Append Agent bubble with typewriter effects
         await appendMessage('agent', data.response || "No response core loaded.");
 
@@ -639,7 +535,6 @@ async function sendMessage() {
     } catch (err) {
         loadingDiv.remove();
         stopThinkingProgress();
-        playSound('receive');
         appendMessage('agent', `**Hextech Error Core:** ${err.message}`, false);
     } finally {
         chatInput.disabled = false;
@@ -652,12 +547,68 @@ function scrollToBottom() {
     chatMessagesEl.scrollTop = chatMessagesEl.scrollHeight;
 }
 
+function confirmHextechPurge() {
+    return new Promise((resolve) => {
+        const modal = document.getElementById('custom-modal');
+        const confirmBtn = document.getElementById('modal-confirm-btn');
+        const cancelBtn = document.getElementById('modal-cancel-btn');
+
+        if (!modal || !confirmBtn || !cancelBtn) {
+            resolve(false);
+            return;
+        }
+
+        const show = () => {
+            modal.classList.add('active');
+        };
+
+        const hide = () => {
+            modal.classList.remove('active');
+        };
+
+        const onConfirm = () => {
+            hide();
+            cleanup();
+            resolve(true);
+        };
+
+        const onCancel = () => {
+            hide();
+            cleanup();
+            resolve(false);
+        };
+
+        const cleanup = () => {
+            confirmBtn.removeEventListener('click', onConfirm);
+            cancelBtn.removeEventListener('click', onCancel);
+        };
+
+        confirmBtn.addEventListener('click', onConfirm);
+        cancelBtn.addEventListener('click', onCancel);
+
+        show();
+    });
+}
+
+function showToastNotification(message) {
+    const toast = document.getElementById('custom-toast');
+    const toastMsg = document.getElementById('toast-message');
+    if (!toast || !toastMsg) return;
+
+    toastMsg.textContent = message;
+    toast.classList.add('active');
+
+    // Snappy: shows for exactly 0.1 seconds (100ms) then disappears
+    setTimeout(() => {
+        toast.classList.remove('active');
+    }, 100);
+}
+
 async function deleteSession(threadId) {
-    const verify = confirm("Delete this Hextech Archive permanent?");
+    const verify = await confirmHextechPurge();
     if (!verify) return;
 
     try {
-        playSound('click');
         await fetch(`/api/sessions/${threadId}`, { method: 'DELETE' });
 
         // Clear cached storage keys
@@ -676,6 +627,7 @@ async function deleteSession(threadId) {
         }
 
         fetchSessions();
+        showToastNotification("Session Deleted.");
     } catch (err) {
         console.error("Failed to delete session", err);
     }
@@ -807,13 +759,11 @@ function toggleParticles() {
         particlesToggle.classList.add('active');
         particlesToggle.innerHTML = '<span class="particles-icon">✨</span> Matrix On';
         initParticlesCanvas();
-        playSound('click');
     } else {
         particlesToggle.classList.remove('active');
         particlesToggle.innerHTML = '<span class="particles-icon">✨</span> Matrix Off';
         cancelAnimationFrame(animationFrameId);
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-        playSound('click');
     }
 }
 

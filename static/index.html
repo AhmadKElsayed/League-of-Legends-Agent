@@ -69,29 +69,6 @@
                 </div>
 
                 <div class="header-actions">
-                    <!-- Background Splash Picker -->
-                    <div class="header-control wallpaper-control" title="Change Background Splash">
-                        <span class="control-icon">🖼️</span>
-                        <select id="bg-selector">
-                            <option value="ryze">Ryze</option>
-                            <option value="aurelion">Aurelion Sol</option>
-                            <option value="jinx">Jinx</option>
-                            <option value="ahri">Ahri</option>
-                            <option value="yasuo">Yasuo</option>
-                            <option value="lux">Lux</option>
-                            <option value="senna">Senna</option>
-                            <option value="pantheon">Pantheon</option>
-                            <option value="zed">Zed</option>
-                            <option value="akali">Akali</option>
-                            <option value="ekko">Ekko</option>
-                        </select>
-                    </div>
-
-                    <!-- Web Audio synthesized sound toggle -->
-                    <button id="sound-toggle" class="header-control-btn" title="Toggle synthesized client SFX">
-                        <span class="sound-icon">🔈</span> Sound Off
-                    </button>
-
                     <!-- Particle system matrix toggle -->
                     <button id="particles-toggle" class="header-control-btn active"
                         title="Toggle background particle canvas">
@@ -157,8 +134,25 @@
         </main>
     </div>
 
+    <!-- Custom Snappy Hextech Modal Overlay -->
+    <div id="custom-modal" class="custom-modal-overlay">
+        <div class="custom-modal-content">
+            <h3 class="modal-title">Delete chat session?</h3>
+            <p class="modal-desc">Are you sure you want to delete this chat session?</p>
+            <div class="modal-actions">
+                <button id="modal-confirm-btn" class="modal-btn confirm-btn">Delete</button>
+                <button id="modal-cancel-btn" class="modal-btn cancel-btn">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Custom Snappy Hextech Toast Notification -->
+    <div id="custom-toast" class="custom-toast">
+        <span class="toast-icon">⚡</span>
+        <span id="toast-message" class="toast-message">Archive Purged Successfully.</span>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="script.js"></script>
 </body>
-
 </html>
