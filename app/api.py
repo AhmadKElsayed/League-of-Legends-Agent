@@ -1,4 +1,5 @@
 import os
+import json
 import sqlite3
 import logging
 import logging.config
@@ -6,14 +7,15 @@ import aiosqlite
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
+from dotenv import load_dotenv
+load_dotenv()
+
 from app.agent.graph import workflow, lol_agent
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
-from dotenv import load_dotenv
 from app.agent_logger import log_session_header, log_session_footer
-
-load_dotenv()
 
 # ---------------------------------------------------------------------------
 # Logging Configuration
@@ -76,7 +78,8 @@ async def lifespan(app: FastAPI):
     global db_conn, agent
     try:
         # Create an async connection to the SQLite DB
-        db_conn = await aiosqlite.connect("memory.db", check_same_thread=False)
+        os.makedirs("data", exist_ok=True)
+        db_conn = await aiosqlite.connect("data/memory.db", check_same_thread=False)
         memory = AsyncSqliteSaver(db_conn)
         
         # This creates the checkpoints table if it doesn't exist
@@ -102,37 +105,50 @@ class ChatRequest(BaseModel):
 class ChatResponse(BaseModel):
     response: str
 
-@app.post("/chat", response_model=ChatResponse)
+@app.post("/chat")
 async def chat_endpoint(request: ChatRequest):
     log_session_header(request.thread_id, request.message)
     initial_state = {"messages": [HumanMessage(content=request.message)]}
     config = {"configurable": {"thread_id": request.thread_id}}
     
-    final_state = None
-    try:
-        async for s in agent.astream(initial_state, config, stream_mode="values"):
-            final_state = s
+    async def event_generator():
+        accumulated_text = ""
+        try:
+            async for event in agent.astream_events(initial_state, config, version="v2"):
+                kind = event["event"]
+                name = event["name"]
+                metadata = event.get("metadata", {})
+                node = metadata.get("langgraph_node")
+                
+                # 1. Yield active node changes for status updates
+                if kind == "on_chain_start" and node:
+                    yield f"event: status\ndata: {json.dumps({'node': node})}\n\n"
+                
+                # 2. Yield token streams from the active worker generating answer text
+                elif kind == "on_chat_model_stream":
+                    if node in ["GeneralAgent", "OPGGWorker", "ResearchWorker"]:
+                        chunk = event["data"]["chunk"]
+                        if chunk.content:
+                            accumulated_text += chunk.content
+                            yield f"event: token\ndata: {json.dumps({'text': chunk.content})}\n\n"
             
-        final_message = final_state["messages"][-1].content
-        if isinstance(final_message, list):
-            text_parts = [part.get("text", "") for part in final_message if isinstance(part, dict) and part.get("type") == "text"]
-            final_message = "\n".join(text_parts)
+            log_session_footer(request.thread_id, accumulated_text)
+            yield "event: done\ndata: {}\n\n"
             
-        log_session_footer(request.thread_id, str(final_message))
-        return ChatResponse(response=str(final_message))
-        
-    except Exception as e:
-        logger.exception(f"Session {request.thread_id} - Error:")
-        raise HTTPException(status_code=500, detail=str(e))
+        except Exception as e:
+            logger.exception(f"Session {request.thread_id} - Streaming Error:")
+            yield f"event: error\ndata: {json.dumps({'error': str(e)})}\n\n"
+            
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
 
 @app.get("/api/sessions")
 async def get_sessions():
     """Fetch all unique thread IDs from the sqlite checkpointer"""
     try:
-        if not os.path.exists("memory.db"):
+        if not os.path.exists("data/memory.db"):
             return {"sessions": []}
             
-        conn = sqlite3.connect("memory.db")
+        conn = sqlite3.connect("data/memory.db")
         cursor = conn.cursor()
         
         # Extract thread IDs sorted by recency

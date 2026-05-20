@@ -423,8 +423,13 @@ function stopThinkingProgress() {
 // ---------------------------------------------------------------------------
 // Typewriter Response Engine & Streaming
 // ---------------------------------------------------------------------------
-function skipTypewriter() {
+function skipTypewriter(e) {
     if (activeTypewriterResolve) {
+        // Only skip if clicking on a message, or on a button/input specifically
+        const tag = e.target.tagName.toLowerCase();
+        if (tag === 'button' || tag === 'input' || e.target.closest('#sidebar') || e.target.closest('.chat-input-container')) {
+            return;
+        }
         activeTypewriterResolve(); // Resolve immediately
     }
 }
@@ -504,6 +509,21 @@ function appendMessage(role, content, animate = true) {
 // ---------------------------------------------------------------------------
 // Send Message
 // ---------------------------------------------------------------------------
+function createAgentBubble() {
+    // Remove empty landing view if it exists
+    const landing = document.getElementById('landing-view');
+    if (landing) landing.remove();
+
+    const div = document.createElement('div');
+    div.className = 'message agent';
+    chatMessagesEl.appendChild(div);
+    scrollToBottom();
+    return div;
+}
+
+// ---------------------------------------------------------------------------
+// Send Message
+// ---------------------------------------------------------------------------
 async function sendMessage() {
     const text = chatInput.value.trim();
     if (!text || !currentThreadId) return;
@@ -532,20 +552,91 @@ async function sendMessage() {
             body: JSON.stringify({ message: text, thread_id: currentThreadId })
         });
 
-        const data = await res.json();
+        if (!res.ok) {
+            throw new Error(`HTTP ${res.status}`);
+        }
 
         // Remove loading dots & dynamic logging
         loadingDiv.remove();
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        let agentMessageDiv = null;
+        let fullResponseText = '';
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+
+            // SSE events are separated by double newlines
+            let parts = buffer.split('\n\n');
+            // Keep the last partial event in the buffer
+            buffer = parts.pop();
+
+            for (let part of parts) {
+                if (!part.trim()) continue;
+
+                // Parse the event block
+                let lines = part.split('\n');
+                let eventType = '';
+                let dataString = '';
+
+                for (let line of lines) {
+                    if (line.startsWith('event:')) {
+                        eventType = line.slice(6).trim();
+                    } else if (line.startsWith('data:')) {
+                        dataString = line.slice(5).trim();
+                    }
+                }
+
+                if (eventType === 'status') {
+                    try {
+                        const data = JSON.parse(dataString);
+                        const nodeName = data.node;
+                        const statusMap = {
+                            'Supervisor': 'Supervisor is analyzing query routes...',
+                            'OPGGWorker': 'OP.GG Analyst is crawling match databases...',
+                            'ResearchWorker': 'Research Analyst is searching Tavily web logs...',
+                            'GeneralAgent': 'Nexus is formulating general chat...'
+                        };
+                        if (thinkingStatus) {
+                            thinkingStatus.textContent = statusMap[nodeName] || `Interfacing with ${nodeName}...`;
+                        }
+                    } catch (e) {}
+                } else if (eventType === 'token') {
+                    try {
+                        const data = JSON.parse(dataString);
+                        if (!agentMessageDiv) {
+                            agentMessageDiv = createAgentBubble();
+                        }
+                        fullResponseText += data.text;
+                        agentMessageDiv.innerHTML = marked.parse(fullResponseText);
+                        scrollToBottom();
+                    } catch (e) {}
+                } else if (eventType === 'error') {
+                    try {
+                        const data = JSON.parse(dataString);
+                        throw new Error(data.error);
+                    } catch (e) {
+                        throw new Error("Streaming error occurred.");
+                    }
+                } else if (eventType === 'done') {
+                    // Stream finished successfully
+                }
+            }
+        }
+
         stopThinkingProgress();
-
-        // Append Agent bubble with typewriter effects
-        await appendMessage('agent', data.response || "No response core loaded.");
-
         // Refresh sidebar previews
         fetchSessions();
 
     } catch (err) {
-        loadingDiv.remove();
+        if (loadingDiv.parentNode) {
+            loadingDiv.remove();
+        }
         stopThinkingProgress();
         appendMessage('agent', `**Hextech Error Core:** ${err.message}`, false);
     } finally {

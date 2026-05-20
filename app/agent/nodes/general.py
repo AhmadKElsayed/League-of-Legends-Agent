@@ -1,17 +1,8 @@
-import os
-from dotenv import load_dotenv
-from langchain_openrouter import ChatOpenRouter
 from langchain_core.messages import SystemMessage
+from app.agent.llm import get_llm
+from app.agent_logger import log_llm_response
 
-load_dotenv()
-
-llm = ChatOpenRouter(model="google/gemini-2.5-flash", temperature=0.4, max_tokens=2000)
-
-# llm = ChatOllama(
-#     model="llama3.1", 
-#     temperature=0,
-#     base_url=os.getenv("OLLAMA_BASE_URL")
-# )
+llm = get_llm("google/gemini-2.5-flash", temperature=0.4, max_tokens=1000)
 
 SYSTEM_PROMPT = """\
 You are **Nexus**, a charismatic League of Legends companion.
@@ -38,14 +29,12 @@ You are **Nexus**, a charismatic League of Legends companion.
 - Keep it scannable — no walls of text.
 """
 
-from app.agent_logger import log_llm_response
-
-def general_agent_node(state):
+async def general_agent_node(state):
     system_message = SystemMessage(content=SYSTEM_PROMPT)
     
     # Combine it cleanly with the state messages
     messages = [system_message] + list(state["messages"])
     
-    response = llm.invoke(messages)
+    response = await llm.ainvoke(messages)
     log_llm_response("GeneralAgent", response)
     return {"messages": [response]}

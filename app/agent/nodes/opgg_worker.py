@@ -1,20 +1,15 @@
 import os
 import pathlib
-from langchain_openrouter import ChatOpenRouter
 from langchain_core.messages import SystemMessage, ToolMessage, AIMessage
 from langchain_mcp_adapters.client import MultiServerMCPClient
 from langchain_mcp_adapters.tools import load_mcp_tools
 from dotenv import load_dotenv
 from app.agent_logger import log_llm_response, log_tool_result
+from app.agent.llm import get_llm
 
 load_dotenv()
 
-llm = ChatOpenRouter(model="deepseek/deepseek-v4-flash", temperature=0.2)
-# llm = ChatOllama(
-#     model="qwen2.5:72b", 
-#     temperature=0.2,
-#     base_url=os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
-# )
+llm = get_llm("deepseek/deepseek-v4-flash", temperature=0.2)
 
 async def opgg_worker_node(state):
     # 1. Path logic

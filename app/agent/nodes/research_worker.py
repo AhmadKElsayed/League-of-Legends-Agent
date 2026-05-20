@@ -1,18 +1,13 @@
 import os
 from dotenv import load_dotenv
-from langchain_openrouter import ChatOpenRouter
 from langchain_core.messages import SystemMessage, ToolMessage, AIMessage
 from langchain_tavily import TavilySearch
 from app.agent_logger import log_llm_response, log_tool_result
+from app.agent.llm import get_llm
 
 load_dotenv()
 
-llm = ChatOpenRouter(model="nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:freeh", temperature=0.5)
-# llm = ChatOllama(
-#     model="qwen2.5:72b", 
-#     temperature=0,
-#     base_url=os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
-# )
+llm = get_llm("nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free", temperature=0.5)
 
 tavily_tool = TavilySearch(max_results=5)
 
