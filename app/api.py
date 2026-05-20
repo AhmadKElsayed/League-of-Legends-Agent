@@ -122,7 +122,7 @@ async def chat_endpoint(request: ChatRequest):
         return ChatResponse(response=str(final_message))
         
     except Exception as e:
-        logger.error(f"Session {request.thread_id} - Error: {str(e)}")
+        logger.exception(f"Session {request.thread_id} - Error:")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/sessions")

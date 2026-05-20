@@ -7,7 +7,7 @@ from app.agent_logger import log_llm_response, log_tool_result
 
 load_dotenv()
 
-llm = ChatOpenRouter(model="google/gemini-2.5-flash", temperature=0.5, max_tokens=8000)
+llm = ChatOpenRouter(model="nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:freeh", temperature=0.5)
 # llm = ChatOllama(
 #     model="qwen2.5:72b", 
 #     temperature=0,

@@ -22,7 +22,8 @@ class AgentState(TypedDict):
 # --- THE GENERAL AGENT NODE ---
 llm = ChatOpenRouter(
     model="google/gemini-2.5-flash-lite", 
-    temperature=0.7
+    temperature=0.7,
+    max_tokens=4000
 )
 
 async def general_agent_node(state):
