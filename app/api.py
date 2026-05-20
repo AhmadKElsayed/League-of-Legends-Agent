@@ -3,8 +3,9 @@ import json
 import sqlite3
 import logging
 import logging.config
+import pathlib
 import aiosqlite
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, AsyncExitStack
 from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import StreamingResponse
@@ -16,6 +17,10 @@ load_dotenv()
 from app.agent.graph import workflow, lol_agent
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from app.agent_logger import log_session_header, log_session_footer
+
+from langchain_mcp_adapters.client import MultiServerMCPClient
+from langchain_mcp_adapters.tools import load_mcp_tools
+from app.agent.nodes.opgg_worker import set_persistent_session, clear_persistent_session
 
 # ---------------------------------------------------------------------------
 # Logging Configuration
@@ -76,6 +81,7 @@ agent = lol_agent # Default fallback
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global db_conn, agent
+    exit_stack = AsyncExitStack()
     try:
         # Create an async connection to the SQLite DB
         os.makedirs("data", exist_ok=True)
@@ -90,11 +96,48 @@ async def lifespan(app: FastAPI):
         logger.info("AsyncSqliteSaver successfully initialized.")
     except Exception as e:
         logger.error(f"Failed to initialize memory: {e}")
+
+    # Initialize Persistent MCP Session
+    try:
+        possible_paths = [
+            os.getenv("OPGG_MCP_PATH"),
+            "./opgg-mcp/dist/index.js"
+        ]
+        opgg_server_path = next((p for p in possible_paths if p and pathlib.Path(p).exists()), None)
         
-    yield
-    
-    if db_conn:
-        await db_conn.close()
+        if opgg_server_path:
+            logger.info(f"Initializing persistent MCP session with: {opgg_server_path}")
+            mcp_client = MultiServerMCPClient({
+                "opgg": {
+                    "transport": "stdio",
+                    "command": "node",
+                    "args": [opgg_server_path]
+                }
+            })
+            
+            # Enter the session context and store references
+            session = await exit_stack.enter_async_context(mcp_client.session("opgg"))
+            
+            # Pre-load tools
+            all_tools = await load_mcp_tools(session)
+            lol_tools = [t for t in all_tools if t.name.startswith("lol_")]
+            
+            await set_persistent_session(session, mcp_client, lol_tools)
+            logger.info(f"Persistent MCP session successfully initialized with {len(lol_tools)} tools.")
+        else:
+            logger.warning("OPGG MCP server path not found. Persistent MCP session skipped.")
+    except Exception as e:
+        logger.error(f"Failed to initialize persistent MCP session: {e}")
+        
+    try:
+        yield
+    finally:
+        logger.info("Closing persistent database connection and MCP sessions...")
+        await clear_persistent_session()
+        await exit_stack.aclose()
+        if db_conn:
+            await db_conn.close()
+        logger.info("Shutdown cleanup complete.")
 
 app = FastAPI(title="League of Legends Agent API", lifespan=lifespan)
 

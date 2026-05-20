@@ -9,7 +9,78 @@ from app.agent.llm import get_llm
 
 load_dotenv()
 
+# Global variables for persistent MCP session (configured via api.py lifespan)
+mcp_session = None
+mcp_client = None
+mcp_tools = []
+
+async def set_persistent_session(session, client, tools):
+    global mcp_session, mcp_client, mcp_tools
+    mcp_session = session
+    mcp_client = client
+    mcp_tools = tools
+
+async def clear_persistent_session():
+    global mcp_session, mcp_client, mcp_tools
+    mcp_session = None
+    mcp_client = None
+    mcp_tools = []
+
 llm = get_llm("deepseek/deepseek-v4-flash", temperature=0.2)
+
+async def _execute_agent_loop(messages, lol_tools, tool_map, agent_with_tools, node_name):
+    new_messages = []
+    
+    # --- SELF-CORRECTION LOOP ---
+    max_retries = 3
+    attempts = 0
+    
+    while attempts < max_retries:
+        response = await agent_with_tools.ainvoke(messages)
+        
+        # Tag the response so the Supervisor knows who spoke
+        if isinstance(response, AIMessage):
+            response.name = "OPGGWorker"
+        
+        new_messages.append(response)
+        log_llm_response(node_name, response)
+        
+        if not response.tool_calls:
+            break
+            
+        messages.append(response)
+        tool_execution_failed = False
+        
+        for tool_call in response.tool_calls:
+            tool = tool_map[tool_call["name"]]
+            try:
+                tool_result = await tool.ainvoke(tool_call["args"])
+                content = str(tool_result)
+            except Exception as e:
+                content = f"API Error: {str(e)}. Please correct your arguments (especially desired_output_fields) and try again."
+                tool_execution_failed = True
+                print(f"⚠️ Tool '{tool_call['name']}' failed. Retrying... ({e})")
+            
+            tool_msg = ToolMessage(content=content, name=tool_call["name"], tool_call_id=tool_call["id"])
+            messages.append(tool_msg)
+            new_messages.append(tool_msg)
+            log_tool_result(node_name, tool_call["name"], tool_call["id"], content)
+            
+        # If this is the last attempt and we executed tool calls, we must do a final text synthesis
+        if attempts + 1 == max_retries:
+            final_response = await llm.ainvoke(messages)
+            if isinstance(final_response, AIMessage):
+                final_response.name = node_name
+            new_messages.append(final_response)
+            log_llm_response(node_name, final_response)
+            break
+            
+        attempts += 1
+        
+        if attempts == max_retries:
+            print("❌ Agent exhausted all search retries.")
+            
+    return new_messages
 
 async def opgg_worker_node(state):
     # 1. Path logic
@@ -72,74 +143,26 @@ Your job is to retrieve accurate data using your OPGG tools and present it in a 
 - End with a **one-sentence takeaway** that gives the user an actionable insight.
 """)
 
-    node_name = "OP.GG hWorker"
-
-    client = MultiServerMCPClient({
-        "opgg": {
-            "transport": "stdio",
-            "command": "node",
-            "args": [opgg_server_path]
-        }
-    })
-    
+    node_name = "OP.GG Worker"
     messages = [system_msg] + state["messages"]
-    new_messages = []
-    
-    async with client.session("opgg") as session:
-        # Load all tools and filter for LoL only
-        all_tools = await load_mcp_tools(session)
-        lol_tools = [t for t in all_tools if t.name.startswith("lol_")]
-        
-        tool_map = {tool.name: tool for tool in lol_tools}
-        agent_with_tools = llm.bind_tools(lol_tools)
-        
-        # --- SELF-CORRECTION LOOP ---
-        max_retries = 3
-        attempts = 0
-        
-        while attempts < max_retries:
-            response = await agent_with_tools.ainvoke(messages)
-            
-            # Tag the response so the Supervisor knows who spoke
-            if isinstance(response, AIMessage):
-                response.name = "OPGGWorker"
-            
-            new_messages.append(response)
-            log_llm_response(node_name, response)
-            
-            if not response.tool_calls:
-                break
-                
-            messages.append(response)
-            tool_execution_failed = False
-            
-            for tool_call in response.tool_calls:
-                tool = tool_map[tool_call["name"]]
-                try:
-                    tool_result = await tool.ainvoke(tool_call["args"])
-                    content = str(tool_result)
-                except Exception as e:
-                    content = f"API Error: {str(e)}. Please correct your arguments (especially desired_output_fields) and try again."
-                    tool_execution_failed = True
-                    print(f"⚠️ Tool '{tool_call['name']}' failed. Retrying... ({e})")
-                
-                tool_msg = ToolMessage(content=content, name=tool_call["name"], tool_call_id=tool_call["id"])
-                messages.append(tool_msg)
-                new_messages.append(tool_msg)
-                log_tool_result(node_name, tool_call["name"], tool_call["id"], content)
-                
-            # If this is the last attempt and we executed tool calls, we must do a final text synthesis
-            if attempts + 1 == max_retries:
-                final_response = await llm.ainvoke(messages)
-                if isinstance(final_response, AIMessage):
-                    final_response.name = node_name
-                new_messages.append(final_response)
-                log_llm_response(node_name, final_response)
-                break
-                
-            attempts += 1
-            
-            if attempts == max_retries:
-                print("❌ Agent exhausted all search retries.")
+
+    if mcp_session is not None:
+        tool_map = {tool.name: tool for tool in mcp_tools}
+        agent_with_tools = llm.bind_tools(mcp_tools)
+        new_messages = await _execute_agent_loop(messages, mcp_tools, tool_map, agent_with_tools, node_name)
+    else:
+        client = MultiServerMCPClient({
+            "opgg": {
+                "transport": "stdio",
+                "command": "node",
+                "args": [opgg_server_path]
+            }
+        })
+        async with client.session("opgg") as session:
+            all_tools = await load_mcp_tools(session)
+            lol_tools = [t for t in all_tools if t.name.startswith("lol_")]
+            tool_map = {tool.name: tool for tool in lol_tools}
+            agent_with_tools = llm.bind_tools(lol_tools)
+            new_messages = await _execute_agent_loop(messages, lol_tools, tool_map, agent_with_tools, node_name)
             
     return {"messages": new_messages}
