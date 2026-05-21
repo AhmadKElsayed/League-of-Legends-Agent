@@ -152,7 +152,7 @@ function startSplashRotation() {
 // ---------------------------------------------------------------------------
 // Session Renaming & Local Storage Cache
 // ---------------------------------------------------------------------------
-function renameActiveSession() {
+async function renameActiveSession() {
     if (!currentThreadId) return;
 
     const originalTitle = currentChatTitle.textContent;
@@ -160,19 +160,36 @@ function renameActiveSession() {
 
     if (newTitle && newTitle.trim()) {
         const sanitized = newTitle.trim();
-        // Save to browser cache
-        localStorage.setItem(`session_title_${currentThreadId}`, sanitized);
+        
         currentChatTitle.textContent = sanitized;
+
+        // Save to backend
+        await setSessionName(currentThreadId, sanitized);
+
+        // Update local cache
+        const session = cachedSessions.find(s => s.thread_id === currentThreadId);
+        if (session) session.custom_name = sanitized;
 
         // Redraw lists
         renderSessions(cachedSessions);
     }
 }
 
+async function setSessionName(threadId, newName) {
+    try {
+        await fetch(`/api/sessions/${threadId}/rename`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: newName })
+        });
+    } catch (err) {
+        console.error("Failed to rename session", err);
+    }
+}
+
 function getSessionName(session) {
-    // Check if user set a custom title in cache
-    const custom = localStorage.getItem(`session_title_${session.thread_id}`);
-    if (custom) return custom;
+    // Check if user set a custom title in backend
+    if (session.custom_name) return session.custom_name;
 
     // Fallback to auto preview
     return session.preview || "Chat Session";
@@ -224,16 +241,18 @@ function renderSessions(sessions) {
         });
 
         // Double click to rename directly from sidebar
-        div.addEventListener('dblclick', (e) => {
+        div.addEventListener('dblclick', async (e) => {
             if (e.target.classList.contains('delete-btn')) return;
 
             const originalName = displayName;
             const newName = prompt("Rename archives:", originalName);
             if (newName && newName.trim()) {
-                localStorage.setItem(`session_title_${session.thread_id}`, newName.trim());
+                const sanitized = newName.trim();
+                session.custom_name = sanitized;
+                await setSessionName(session.thread_id, sanitized);
                 fetchSessions();
                 if (currentThreadId === session.thread_id) {
-                    currentChatTitle.textContent = newName.trim();
+                    currentChatTitle.textContent = sanitized;
                 }
             }
         });
@@ -294,7 +313,11 @@ async function loadSession(threadId) {
     renameChatBtn.style.display = 'block';
 
     // Find active name
-    const activeName = getSessionName({ thread_id: threadId });
+    let activeName = "Chat Session";
+    const session = cachedSessions.find(s => s.thread_id === threadId);
+    if (session) {
+        activeName = getSessionName(session);
+    }
     currentChatTitle.textContent = activeName;
 
     // Show spinner inside messages viewport
@@ -713,9 +736,6 @@ async function deleteSession(threadId) {
 
     try {
         await fetch(`/api/sessions/${threadId}`, { method: 'DELETE' });
-
-        // Clear cached storage keys
-        localStorage.removeItem(`session_title_${threadId}`);
 
         if (currentThreadId === threadId) {
             currentThreadId = null;

@@ -91,6 +91,15 @@ async def lifespan(app: FastAPI):
         # This creates the checkpoints table if it doesn't exist
         await memory.setup()
         
+        # Setup session metadata table for custom session names
+        await db_conn.execute("""
+            CREATE TABLE IF NOT EXISTS session_metadata (
+                thread_id TEXT PRIMARY KEY,
+                custom_name TEXT
+            )
+        """)
+        await db_conn.commit()
+        
         # Compile the workflow with the async memory checkpointer
         agent = workflow.compile(checkpointer=memory)
         logger.info("AsyncSqliteSaver successfully initialized.")
@@ -195,12 +204,19 @@ async def get_sessions():
         cursor = conn.cursor()
         
         # Extract thread IDs sorted by recency
-        cursor.execute("SELECT thread_id FROM checkpoints GROUP BY thread_id ORDER BY max(rowid) DESC")
+        cursor.execute("""
+            SELECT c.thread_id, m.custom_name
+            FROM checkpoints c
+            LEFT JOIN session_metadata m ON c.thread_id = m.thread_id
+            GROUP BY c.thread_id 
+            ORDER BY max(c.rowid) DESC
+        """)
         rows = cursor.fetchall()
         
         sessions = []
         for row in rows:
             thread_id = row[0]
+            custom_name = row[1]
             config = {"configurable": {"thread_id": thread_id}}
             try:
                 state = await agent.aget_state(config)
@@ -218,11 +234,15 @@ async def get_sessions():
                             preview = str(content)[:30] + "..."
                             break
                             
-                if preview != "Empty Chat":
-                    sessions.append({"thread_id": thread_id, "preview": preview})
+                if preview != "Empty Chat" or custom_name:
+                    sessions.append({
+                        "thread_id": thread_id, 
+                        "preview": preview,
+                        "custom_name": custom_name
+                    })
             except Exception as e:
                 logger.error(f"Error fetching state for {thread_id}: {e}")
-                sessions.append({"thread_id": thread_id, "preview": "Chat Session"})
+                sessions.append({"thread_id": thread_id, "preview": "Chat Session", "custom_name": custom_name})
                 
         conn.close()
         return {"sessions": sessions}
@@ -252,6 +272,27 @@ async def get_session_history(thread_id: str):
             
     return {"messages": formatted_messages}
 
+class RenameRequest(BaseModel):
+    name: str
+
+@app.put("/api/sessions/{thread_id}/rename")
+async def rename_session(thread_id: str, request: RenameRequest):
+    global db_conn
+    try:
+        if db_conn:
+            await db_conn.execute("""
+                INSERT INTO session_metadata (thread_id, custom_name)
+                VALUES (?, ?)
+                ON CONFLICT(thread_id) DO UPDATE SET custom_name = excluded.custom_name
+            """, (thread_id, request.name))
+            await db_conn.commit()
+            return {"status": "success", "custom_name": request.name}
+        else:
+            raise Exception("Database connection not initialized")
+    except Exception as e:
+        logger.error(f"Error renaming session {thread_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.delete("/api/sessions/{thread_id}")
 async def delete_session(thread_id: str):
     global db_conn
@@ -259,6 +300,7 @@ async def delete_session(thread_id: str):
         if db_conn:
             await db_conn.execute("DELETE FROM checkpoints WHERE thread_id = ?", (thread_id,))
             await db_conn.execute("DELETE FROM writes WHERE thread_id = ?", (thread_id,))
+            await db_conn.execute("DELETE FROM session_metadata WHERE thread_id = ?", (thread_id,))
             await db_conn.commit()
             return {"status": "success"}
         else:
