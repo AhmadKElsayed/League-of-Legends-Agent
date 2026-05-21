@@ -156,7 +156,7 @@ async function renameActiveSession() {
     if (!currentThreadId) return;
 
     const originalTitle = currentChatTitle.textContent;
-    const newTitle = prompt("Enter a custom archives name:", originalTitle);
+    const newTitle = await confirmHextechRename(originalTitle);
 
     if (newTitle && newTitle.trim()) {
         const sanitized = newTitle.trim();
@@ -245,7 +245,7 @@ function renderSessions(sessions) {
             if (e.target.classList.contains('delete-btn')) return;
 
             const originalName = displayName;
-            const newName = prompt("Rename archives:", originalName);
+            const newName = await confirmHextechRename(originalName);
             if (newName && newName.trim()) {
                 const sanitized = newName.trim();
                 session.custom_name = sanitized;
@@ -412,36 +412,9 @@ function renderLandingView() {
 }
 
 // ---------------------------------------------------------------------------
-// Progressive thinking progress bar
+// Inline Routing Indicator
 // ---------------------------------------------------------------------------
-let thinkingProgressInterval = null;
-const thinkingStatements = [
-    "Interfacing with Runeterra Archives...",
-    "Crawling OP.GG champion databases...",
-    "Retrieving itemization win rates...",
-    "Analyzing matchup counter mechanics...",
-    "Formulating optimal tactical strategy...",
-    "Synthesizing cognitive agent insights..."
-];
-
-function startThinkingProgress() {
-    thinkingBar.style.display = 'flex';
-    let index = 0;
-    thinkingStatus.textContent = thinkingStatements[0];
-
-    thinkingProgressInterval = setInterval(() => {
-        index = (index + 1) % thinkingStatements.length;
-        thinkingStatus.textContent = thinkingStatements[index];
-    }, 2800);
-}
-
-function stopThinkingProgress() {
-    if (thinkingProgressInterval) {
-        clearInterval(thinkingProgressInterval);
-        thinkingProgressInterval = null;
-    }
-    thinkingBar.style.display = 'none';
-}
+let activeRoutingDiv = null;
 
 // ---------------------------------------------------------------------------
 // Typewriter Response Engine & Streaming
@@ -559,14 +532,16 @@ async function sendMessage() {
     // Append human query bubble
     appendMessage('human', text, false);
 
-    // Initiate loader dots and progressive terminal logging
-    const loadingDiv = document.createElement('div');
-    loadingDiv.className = 'loading';
-    loadingDiv.innerHTML = '<span></span><span></span><span></span>';
-    chatMessagesEl.appendChild(loadingDiv);
+    // Initiate loader dots and routing text inline
+    activeRoutingDiv = document.createElement('div');
+    activeRoutingDiv.className = 'message agent hextech-terminal';
+    activeRoutingDiv.style.border = "none";
+    activeRoutingDiv.style.background = "transparent";
+    activeRoutingDiv.style.boxShadow = "none";
+    activeRoutingDiv.style.padding = "0";
+    activeRoutingDiv.innerHTML = `<div class="hextech-terminal-header" style="border-radius: 4px; display: inline-flex;"><span class="routing-text" style="color: var(--hextech-blue); font-family: 'Courier New', monospace; font-size: 0.9rem;">Initializing Agent Core...</span><div class="loading" style="padding: 0; margin-left: 10px;"><span></span><span></span><span></span></div></div>`;
+    chatMessagesEl.appendChild(activeRoutingDiv);
     scrollToBottom();
-
-    startThinkingProgress();
 
     try {
         const res = await fetch('/chat', {
@@ -578,9 +553,6 @@ async function sendMessage() {
         if (!res.ok) {
             throw new Error(`HTTP ${res.status}`);
         }
-
-        // Remove loading dots & dynamic logging
-        loadingDiv.remove();
 
         const reader = res.body.getReader();
         const decoder = new TextDecoder();
@@ -625,12 +597,18 @@ async function sendMessage() {
                             'ResearchWorker': 'Research Analyst is searching Tavily web logs...',
                             'GeneralAgent': 'Nexus is formulating general chat...'
                         };
-                        if (thinkingStatus) {
-                            thinkingStatus.textContent = statusMap[nodeName] || `Interfacing with ${nodeName}...`;
+                        if (activeRoutingDiv) {
+                            const rt = activeRoutingDiv.querySelector('.routing-text');
+                            if (rt) rt.textContent = statusMap[nodeName] || `Interfacing with ${nodeName}...`;
+                            scrollToBottom();
                         }
                     } catch (e) {}
                 } else if (eventType === 'token') {
                     try {
+                        if (activeRoutingDiv) {
+                            activeRoutingDiv.remove();
+                            activeRoutingDiv = null;
+                        }
                         const data = JSON.parse(dataString);
                         if (!agentMessageDiv) {
                             agentMessageDiv = createAgentBubble();
@@ -638,6 +616,41 @@ async function sendMessage() {
                         fullResponseText += data.text;
                         agentMessageDiv.innerHTML = marked.parse(fullResponseText);
                         scrollToBottom();
+                    } catch (e) {}
+                } else if (eventType === 'tool_log') {
+                    try {
+                        const data = JSON.parse(dataString);
+                        if (data.status === 'start') {
+                            const toolDiv = document.createElement('div');
+                            toolDiv.className = 'hextech-terminal';
+                            
+                            const header = document.createElement('div');
+                            header.className = 'hextech-terminal-header';
+                            header.innerHTML = `<span>🔧 Executing <code>${data.tool}</code></span><span class="tool-loader"></span>`;
+                            
+                            toolDiv.appendChild(header);
+                            if (activeRoutingDiv && activeRoutingDiv.parentNode) {
+                                chatMessagesEl.insertBefore(toolDiv, activeRoutingDiv);
+                            } else {
+                                chatMessagesEl.appendChild(toolDiv);
+                            }
+                            scrollToBottom();
+                            
+                            toolDiv.dataset.toolName = data.tool;
+                        } else if (data.status === 'end') {
+                            const terminals = document.querySelectorAll(`.hextech-terminal[data-tool-name="${data.tool}"]`);
+                            if (terminals.length > 0) {
+                                const lastTerminal = terminals[terminals.length - 1];
+                                const headerSpan = lastTerminal.querySelector('.hextech-terminal-header span:first-child');
+                                const loaderSpan = lastTerminal.querySelector('.tool-loader');
+                                if (headerSpan) {
+                                    headerSpan.innerHTML = `✅ Completed <code>${data.tool}</code>`;
+                                }
+                                if (loaderSpan) {
+                                    loaderSpan.remove();
+                                }
+                            }
+                        }
                     } catch (e) {}
                 } else if (eventType === 'error') {
                     try {
@@ -652,15 +665,18 @@ async function sendMessage() {
             }
         }
 
-        stopThinkingProgress();
+        if (activeRoutingDiv) {
+            activeRoutingDiv.remove();
+            activeRoutingDiv = null;
+        }
         // Refresh sidebar previews
         fetchSessions();
 
     } catch (err) {
-        if (loadingDiv.parentNode) {
-            loadingDiv.remove();
+        if (activeRoutingDiv && activeRoutingDiv.parentNode) {
+            activeRoutingDiv.remove();
+            activeRoutingDiv = null;
         }
-        stopThinkingProgress();
         appendMessage('agent', `**Hextech Error Core:** ${err.message}`, false);
     } finally {
         chatInput.disabled = false;
@@ -716,6 +732,61 @@ function confirmHextechPurge() {
     });
 }
 
+function confirmHextechRename(originalName) {
+    return new Promise((resolve) => {
+        const modal = document.getElementById('rename-modal');
+        const confirmBtn = document.getElementById('rename-confirm-btn');
+        const cancelBtn = document.getElementById('rename-cancel-btn');
+        const input = document.getElementById('rename-input');
+
+        if (!modal || !confirmBtn || !cancelBtn || !input) {
+            resolve(null);
+            return;
+        }
+
+        input.value = originalName;
+
+        const show = () => {
+            modal.classList.add('active');
+            input.focus();
+            input.select();
+        };
+
+        const hide = () => {
+            modal.classList.remove('active');
+        };
+
+        const onConfirm = () => {
+            hide();
+            cleanup();
+            resolve(input.value);
+        };
+
+        const onCancel = () => {
+            hide();
+            cleanup();
+            resolve(null);
+        };
+
+        const onKeyPress = (e) => {
+            if (e.key === 'Enter') onConfirm();
+            if (e.key === 'Escape') onCancel();
+        };
+
+        const cleanup = () => {
+            confirmBtn.removeEventListener('click', onConfirm);
+            cancelBtn.removeEventListener('click', onCancel);
+            input.removeEventListener('keydown', onKeyPress);
+        };
+
+        confirmBtn.addEventListener('click', onConfirm);
+        cancelBtn.addEventListener('click', onCancel);
+        input.addEventListener('keydown', onKeyPress);
+
+        show();
+    });
+}
+
 function showToastNotification(message) {
     const toast = document.getElementById('custom-toast');
     const toastMsg = document.getElementById('toast-message');
@@ -724,10 +795,10 @@ function showToastNotification(message) {
     toastMsg.textContent = message;
     toast.classList.add('active');
 
-    // Snappy: shows for exactly 0.1 seconds (100ms) then disappears
+    // Shows for exactly 3 seconds (3000ms) then disappears
     setTimeout(() => {
         toast.classList.remove('active');
-    }, 100);
+    }, 3000);
 }
 
 async function deleteSession(threadId) {

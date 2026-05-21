@@ -183,6 +183,15 @@ async def chat_endpoint(request: ChatRequest):
                         if chunk.content:
                             accumulated_text += chunk.content
                             yield f"event: token\ndata: {json.dumps({'text': chunk.content})}\n\n"
+                            
+                # 3. Yield tool execution logs
+                elif kind == "on_tool_start":
+                    tool_name = name
+                    yield f"event: tool_log\ndata: {json.dumps({'status': 'start', 'tool': tool_name})}\n\n"
+                    
+                elif kind == "on_tool_end":
+                    tool_name = name
+                    yield f"event: tool_log\ndata: {json.dumps({'status': 'end', 'tool': tool_name})}\n\n"
             
             log_session_footer(request.thread_id, accumulated_text)
             yield "event: done\ndata: {}\n\n"
