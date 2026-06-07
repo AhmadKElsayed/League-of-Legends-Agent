@@ -334,7 +334,17 @@ async function loadSession(threadId) {
 
         if (data.messages && data.messages.length > 0) {
             data.messages.forEach(msg => {
-                appendMessage(msg.type, msg.content, false);
+                if (msg.type === 'tool_log') {
+                    const toolDiv = document.createElement('div');
+                    toolDiv.className = 'hextech-terminal';
+                    const header = document.createElement('div');
+                    header.className = 'hextech-terminal-header';
+                    header.innerHTML = `<span>✅ Completed <code>${msg.tool_name}</code></span>`;
+                    toolDiv.appendChild(header);
+                    chatMessagesEl.appendChild(toolDiv);
+                } else {
+                    appendMessage(msg.type, msg.content, false);
+                }
             });
         } else {
             renderLandingView();
@@ -476,7 +486,7 @@ async function runTypewriter(element, markdownContent) {
 
 function appendMessage(role, content, animate = true) {
     if (role === 'system') return;
-    if (!content) return;
+    if (!content || !content.trim()) return;
 
     // Remove empty landing view if it exists
     const landing = document.getElementById('landing-view');
@@ -534,12 +544,8 @@ async function sendMessage() {
 
     // Initiate loader dots and routing text inline
     activeRoutingDiv = document.createElement('div');
-    activeRoutingDiv.className = 'message agent hextech-terminal';
-    activeRoutingDiv.style.border = "none";
-    activeRoutingDiv.style.background = "transparent";
-    activeRoutingDiv.style.boxShadow = "none";
-    activeRoutingDiv.style.padding = "0";
-    activeRoutingDiv.innerHTML = `<div class="hextech-terminal-header" style="border-radius: 4px; display: inline-flex;"><span class="routing-text" style="color: var(--hextech-blue); font-family: 'Courier New', monospace; font-size: 0.9rem;">Initializing Agent Core...</span><div class="loading" style="padding: 0; margin-left: 10px;"><span></span><span></span><span></span></div></div>`;
+    activeRoutingDiv.className = 'hextech-terminal';
+    activeRoutingDiv.innerHTML = `<div class="hextech-terminal-header"><span class="routing-text">Initializing Agent Core...</span><div class="loading" style="padding: 0; margin-left: 10px;"><span></span><span></span><span></span></div></div>`;
     chatMessagesEl.appendChild(activeRoutingDiv);
     scrollToBottom();
 

@@ -108,7 +108,7 @@ body {
 
 ::-webkit-scrollbar-track {
   background: rgba(1, 10, 19, 0.5);
-  border-left: 1px solid rgba(255, 255, 255, 0.05);
+  border-left: 1px solid var(--glass-border);
 }
 
 ::-webkit-scrollbar-thumb {
@@ -669,6 +669,7 @@ body {
   animation: bubbleFade 0.3s ease-out;
   position: relative;
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.35);
+  flex-shrink: 0;
 }
 
 @keyframes bubbleFade {
@@ -752,6 +753,12 @@ body {
   background: rgba(200, 155, 60, 0.04);
   margin: 14px 0;
   color: var(--text-secondary);
+}
+
+.message.agent hr {
+  border: none;
+  border-top: 1px solid var(--glass-border);
+  margin: 16px 0;
 }
 
 /* Code Styles */
@@ -1146,6 +1153,7 @@ body {
   overflow: hidden;
   box-shadow: 0 0 10px rgba(10, 200, 185, 0.2);
   align-self: flex-start;
+  flex-shrink: 0;
 }
 
 .hextech-terminal-header {
@@ -1159,7 +1167,7 @@ body {
   font-size: 0.85rem;
   color: var(--hextech-blue);
   font-weight: 700;
-  border-bottom: 1px solid transparent;
+  border-bottom: 1px solid rgba(0, 0, 0, 0);
   transition: all 0.2s ease;
 }
 

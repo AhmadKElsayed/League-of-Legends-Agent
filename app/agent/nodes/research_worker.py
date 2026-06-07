@@ -7,7 +7,7 @@ from app.agent.llm import get_llm
 
 load_dotenv()
 
-llm = get_llm("nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free", temperature=0.5)
+llm = get_llm("deepseek/deepseek-v4-flash", temperature=0.5)
 
 tavily_tool = TavilySearch(max_results=5)
 

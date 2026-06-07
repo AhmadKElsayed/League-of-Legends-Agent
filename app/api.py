@@ -272,12 +272,19 @@ async def get_session_history(thread_id: str):
             text_parts = [part.get("text", "") for part in content if isinstance(part, dict) and part.get("type") == "text"]
             content = "\n".join(text_parts)
             
+        content_str = str(content).strip() if content else ""
+            
         if isinstance(msg, HumanMessage):
-            formatted_messages.append({"type": "human", "content": str(content)})
+            if content_str:
+                formatted_messages.append({"type": "human", "content": content_str})
         elif isinstance(msg, AIMessage):
-            formatted_messages.append({"type": "agent", "content": str(content)})
+            tool_calls = getattr(msg, 'tool_calls', [])
+            for tool_call in tool_calls:
+                formatted_messages.append({"type": "tool_log", "tool_name": tool_call["name"]})
+            if content_str:
+                formatted_messages.append({"type": "agent", "content": content_str})
         elif isinstance(msg, SystemMessage):
-            formatted_messages.append({"type": "system", "content": str(content)})
+            pass
             
     return {"messages": formatted_messages}
 
