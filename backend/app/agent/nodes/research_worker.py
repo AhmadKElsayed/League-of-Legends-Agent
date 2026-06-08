@@ -3,11 +3,11 @@ from dotenv import load_dotenv
 from langchain_core.messages import SystemMessage, ToolMessage, AIMessage
 from langchain_tavily import TavilySearch
 from app.agent_logger import log_llm_response, log_tool_result
-from app.agent.llm import get_llm
+from app.agent.llm import get_llm, invoke_with_retry
 
 load_dotenv()
 
-llm = get_llm("deepseek/deepseek-v4-flash", temperature=0.5)
+llm = get_llm("deepseek/deepseek-v4-flash", temperature=0.3)
 
 tavily_tool = TavilySearch(max_results=5)
 
@@ -69,11 +69,16 @@ _List 2-3 of the most relevant sources with brief descriptions of what they cont
     agent_with_tools = llm.bind_tools([tavily_tool])
 
     while attempts < max_retries:
-        # If we are at the last attempt, unbind tools to force a final text response
-        if attempts == max_retries - 1:
-            response = await llm.ainvoke(messages)
-        else:
-            response = await agent_with_tools.ainvoke(messages)
+        try:
+            # If we are at the last attempt, unbind tools to force a final text response
+            if attempts == max_retries - 1:
+                response = await invoke_with_retry(llm, messages)
+            else:
+                response = await invoke_with_retry(agent_with_tools, messages)
+        except Exception as e:
+            print(f"❌ ResearchWorker critical error: {e}")
+            new_messages.append(AIMessage(content=f"An internal error occurred while researching: {e}", name="ResearchWorker"))
+            break
         
         # Tag the AIMessage immediately
         if isinstance(response, AIMessage):

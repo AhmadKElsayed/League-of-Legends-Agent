@@ -10,10 +10,10 @@ services:
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
     volumes:
       - .:/app
-      - /app/.venv
+      - /app/backend/.venv
       - /app/opgg-mcp/node_modules
       - /app/opgg-mcp/dist
-      - sqlite_data:/app/data
+      - sqlite_data:/app/backend/data
     restart: unless-stopped
     extra_hosts:
       - "host.docker.internal:host-gateway"

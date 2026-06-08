@@ -10,19 +10,20 @@ RUN apt-get update && apt-get install -y curl && \
 WORKDIR /app
 
 # 2. Install Python dependencies first (for layer caching)
-COPY pyproject.toml uv.lock ./
-RUN uv sync --frozen --no-dev
+COPY backend/pyproject.toml backend/uv.lock ./backend/
+RUN cd backend && uv sync --frozen --no-dev
 
-# 3. Copy the whole project
-COPY . .
+# 3. Copy the whole project (including backend, frontend, opgg-mcp)
+COPY backend ./backend
+COPY frontend ./frontend
+COPY opgg-mcp ./opgg-mcp
 
 # 4. CRITICAL: Build the OPGG MCP Server
-# This creates the 'dist/index.js' file your agent needs
 WORKDIR /app/opgg-mcp
 RUN npm install && npm run build
 
-# 5. Move back to root and expose your API port
-WORKDIR /app
+# 5. Move to backend and expose your API port
+WORKDIR /app/backend
 EXPOSE 8000
 
 # 6. Run the FastAPI server

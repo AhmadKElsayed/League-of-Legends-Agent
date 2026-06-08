@@ -5,6 +5,7 @@ import logging
 import logging.config
 import pathlib
 import aiosqlite
+import asyncio
 from contextlib import asynccontextmanager, AsyncExitStack
 from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
@@ -12,7 +13,6 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from dotenv import load_dotenv
-load_dotenv()
 
 from app.agent.graph import workflow, lol_agent
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
@@ -21,6 +21,9 @@ from app.agent_logger import log_session_header, log_session_footer
 from langchain_mcp_adapters.client import MultiServerMCPClient
 from langchain_mcp_adapters.tools import load_mcp_tools
 from app.agent.nodes.opgg_worker import set_persistent_session, clear_persistent_session
+
+dotenv_path = pathlib.Path(__file__).parent.parent.parent / ".env"
+load_dotenv(dotenv_path=dotenv_path)
 
 # ---------------------------------------------------------------------------
 # Logging Configuration
@@ -86,6 +89,7 @@ async def lifespan(app: FastAPI):
         # Create an async connection to the SQLite DB
         os.makedirs("data", exist_ok=True)
         db_conn = await aiosqlite.connect("data/memory.db", check_same_thread=False)
+        await db_conn.execute("PRAGMA journal_mode=WAL;")
         memory = AsyncSqliteSaver(db_conn)
         
         # This creates the checkpoints table if it doesn't exist
@@ -110,7 +114,8 @@ async def lifespan(app: FastAPI):
     try:
         possible_paths = [
             os.getenv("OPGG_MCP_PATH"),
-            "./opgg-mcp/dist/index.js"
+            "./opgg-mcp/dist/index.js",
+            "../opgg-mcp/dist/index.js"
         ]
         opgg_server_path = next((p for p in possible_paths if p and pathlib.Path(p).exists()), None)
         
@@ -196,6 +201,9 @@ async def chat_endpoint(request: ChatRequest):
             log_session_footer(request.thread_id, accumulated_text)
             yield "event: done\ndata: {}\n\n"
             
+        except asyncio.CancelledError:
+            logger.info(f"Session {request.thread_id} - Client disconnected during stream.")
+            raise
         except Exception as e:
             logger.exception(f"Session {request.thread_id} - Streaming Error:")
             yield f"event: error\ndata: {json.dumps({'error': str(e)})}\n\n"
@@ -330,4 +338,5 @@ def health_check():
     return {"status": "healthy", "components": ["fastapi", "langgraph", "mcp"]}
 
 # Mount static files at root for the UI
-app.mount("/", StaticFiles(directory="static", html=True), name="static")
+frontend_path = pathlib.Path(__file__).parent.parent.parent / "frontend"
+app.mount("/", StaticFiles(directory=str(frontend_path), html=True), name="static")

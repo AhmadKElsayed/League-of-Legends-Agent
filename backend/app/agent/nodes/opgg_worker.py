@@ -5,7 +5,7 @@ from langchain_mcp_adapters.client import MultiServerMCPClient
 from langchain_mcp_adapters.tools import load_mcp_tools
 from dotenv import load_dotenv
 from app.agent_logger import log_llm_response, log_tool_result
-from app.agent.llm import get_llm
+from app.agent.llm import get_llm, invoke_with_retry
 
 load_dotenv()
 
@@ -36,7 +36,12 @@ async def _execute_agent_loop(messages, lol_tools, tool_map, agent_with_tools, n
     attempts = 0
     
     while attempts < max_retries:
-        response = await agent_with_tools.ainvoke(messages)
+        try:
+            response = await invoke_with_retry(agent_with_tools, messages)
+        except Exception as e:
+            print(f"❌ OPGGWorker critical error: {e}")
+            new_messages.append(AIMessage(content=f"An internal error occurred while communicating with the model: {e}", name="OPGGWorker"))
+            break
         
         # Tag the response so the Supervisor knows who spoke
         if isinstance(response, AIMessage):
@@ -68,7 +73,10 @@ async def _execute_agent_loop(messages, lol_tools, tool_map, agent_with_tools, n
             
         # If this is the last attempt and we executed tool calls, we must do a final text synthesis
         if attempts + 1 == max_retries:
-            final_response = await llm.ainvoke(messages)
+            try:
+                final_response = await invoke_with_retry(llm, messages)
+            except Exception as e:
+                final_response = AIMessage(content=f"An internal error occurred in final synthesis: {e}", name="OPGGWorker")
             if isinstance(final_response, AIMessage):
                 final_response.name = node_name
             new_messages.append(final_response)
@@ -86,12 +94,13 @@ async def opgg_worker_node(state):
     # 1. Path logic
     possible_paths = [
         os.getenv("OPGG_MCP_PATH"),
-        "./opgg-mcp/dist/index.js"
+        "./opgg-mcp/dist/index.js",
+        "../opgg-mcp/dist/index.js"
     ]
     opgg_server_path = next((p for p in possible_paths if p and pathlib.Path(p).exists()), None)
     
     if not opgg_server_path:
-        return {"messages": [AIMessage(content="⚠️ OPGG Worker Error: The MCP server entry point ('opgg-mcp/dist/index.js') was not found. If running locally, please run 'npm install && npm run build' inside the 'opgg-mcp' directory.", name="OPGGWorker")]}
+        return {"messages": [AIMessage(content="⚠️ OPGG Worker Error: The MCP server entry point ('opgg-mcp/dist/index.js' or '../opgg-mcp/dist/index.js') was not found. If running locally, please run 'npm install && npm run build' inside the 'opgg-mcp' directory.", name="OPGGWorker")]}
 
     # 2. Supercharged Persona for Multi-Tool Use
     system_msg = SystemMessage(content="""\

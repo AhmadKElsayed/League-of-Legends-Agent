@@ -2,9 +2,9 @@ from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from pydantic import BaseModel
 from typing import Literal
 from app.agent_logger import log_node_transition
-from app.agent.llm import get_llm
+from app.agent.llm import get_llm, invoke_with_retry
 
-llm = get_llm("google/gemini-2.5-flash", temperature=0.1, max_tokens=1000)
+llm = get_llm("deepseek/deepseek-v4-flash", temperature=0.1, max_tokens=1000)
 
 class Router(BaseModel):
     next_node: Literal["FINISH", "GeneralAgent", "OPGGWorker", "ResearchWorker"]
@@ -43,6 +43,11 @@ prompt = ChatPromptTemplate.from_messages([
 supervisor_chain = prompt | llm.with_structured_output(Router)
 
 async def supervisor_node(state):
-    decision = await supervisor_chain.ainvoke({"messages": state["messages"]})
-    log_node_transition("Supervisor", decision.next_node)
-    return {"next_node": decision.next_node}
+    try:
+        decision = await invoke_with_retry(supervisor_chain, {"messages": state["messages"]})
+        log_node_transition("Supervisor", decision.next_node)
+        return {"next_node": decision.next_node}
+    except Exception as e:
+        print(f"⚠️ Supervisor Error: {e}. Falling back to GeneralAgent.")
+        log_node_transition("Supervisor", "GeneralAgent")
+        return {"next_node": "GeneralAgent"}

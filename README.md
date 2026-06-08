@@ -94,12 +94,14 @@ The app will be available at **http://localhost:8000**.
 
 ```bash
 # Install dependencies
+cd backend
 uv sync
 
 # Build the OP.GG MCP server
-cd opgg-mcp && npm install && npm run build && cd ..
+cd ../opgg-mcp && npm install && npm run build && cd ..
 
 # Start the server
+cd backend
 uv run python main.py
 ```
 
@@ -130,27 +132,21 @@ Or interact with the API docs at **http://localhost:8000/docs**.
 
 ```
 .
-├── app/
-│   ├── api.py                     # FastAPI app, logging config, endpoints
-│   └── agent/
-│       ├── graph.py               # LangGraph state machine & routing
-│       ├── state.py               # Shared agent state definition
-│       └── nodes/
-│           ├── supervisor.py      # Intent classifier & router
-│           ├── opgg_worker.py     # OP.GG data specialist
-│           ├── research_worker.py # Web research agent
-│           └── general.py         # General conversation agent
-├── static/
-│   ├── index.html                 # Chat UI
-│   ├── style.css                  # Styling
-│   └── script.js                  # Frontend logic & session management
-├── opgg-mcp/                      # OP.GG MCP server (Node.js/TypeScript)
-├── test/                          # Agent & tool diagnostic scripts
-├── logs/                          # Rotating log files (auto-generated)
-├── main.py                        # Local dev entrypoint
-├── Dockerfile                     # Multi-stage container build
-├── docker-compose.yml             # Service orchestration
-└── pyproject.toml                 # Python dependencies (managed by uv)
+├── backend/
+│   ├── app/
+│   │   ├── api.py                     # FastAPI app, logging config, endpoints
+│   │   └── agent/                     # LangGraph state machine & routing
+│   ├── test/                          # Agent & tool diagnostic scripts
+│   ├── logs/                          # Rotating log files (auto-generated)
+│   ├── main.py                        # Local dev entrypoint
+│   └── pyproject.toml                 # Python dependencies (managed by uv)
+├── frontend/
+│   ├── index.html                     # Chat UI
+│   ├── style.css                      # Styling
+│   └── script.js                      # Frontend logic & session management
+├── opgg-mcp/                          # OP.GG MCP server (Node.js/TypeScript)
+├── Dockerfile                         # Multi-stage container build
+└── docker-compose.yml                 # Service orchestration
 ```
 
 ---

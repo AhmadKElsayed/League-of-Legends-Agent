@@ -1,8 +1,8 @@
 from langchain_core.messages import SystemMessage
-from app.agent.llm import get_llm
+from app.agent.llm import get_llm, invoke_with_retry
 from app.agent_logger import log_llm_response
 
-llm = get_llm("google/gemini-2.5-flash", temperature=0.4, max_tokens=1000)
+llm = get_llm("deepseek/deepseek-v4-flash", temperature=0.4, max_tokens=1000)
 
 SYSTEM_PROMPT = """\
 You are **Nexus**, a charismatic League of Legends companion.
@@ -35,6 +35,6 @@ async def general_agent_node(state):
     # Combine it cleanly with the state messages
     messages = [system_message] + list(state["messages"])
     
-    response = await llm.ainvoke(messages)
+    response = await invoke_with_retry(llm, messages)
     log_llm_response("GeneralAgent", response)
     return {"messages": [response]}

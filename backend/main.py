@@ -8,7 +8,9 @@ def open_browser():
     webbrowser.open("http://127.0.0.1:8000/")
 
 if __name__ == "__main__":
-    load_dotenv()
+    import pathlib
+    dotenv_path = pathlib.Path(__file__).parent.parent / ".env"
+    load_dotenv(dotenv_path=dotenv_path)
     print("Starting League of Legends Agent API & UI...")
     print("Opening the browser automatically...")
     print("Press Ctrl+C to close the server.")
