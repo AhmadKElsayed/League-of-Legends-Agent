@@ -75,3 +75,6 @@ logs/
 *.sqlite
 *.sqlite3
 
+#Plans
+production_readiness.md
+
