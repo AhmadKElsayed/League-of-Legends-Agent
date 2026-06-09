@@ -56,8 +56,8 @@ graph TD
 | **LLM** | Google Gemini 2.5 Flash via [OpenRouter](https://openrouter.ai/) |
 | **Orchestration** | [LangGraph](https://github.com/langchain-ai/langgraph) (multi-agent state machine) |
 | **API** | FastAPI + Uvicorn |
-| **Frontend** | Vanilla HTML/CSS/JS chat UI with session management |
-| **Memory** | SQLite checkpointer (async, via `aiosqlite`) |
+| **Frontend** | Modern React SPA (Vite) with custom Hextech design system |
+| **Memory** | PostgreSQL checkpointer (async, via `psycopg3` & `AsyncConnectionPool`) |
 | **Tools** | [Tavily Search](https://tavily.com/), [OP.GG MCP Server](./opgg-mcp/) (Node.js/TypeScript) |
 | **Package Manager** | [uv](https://github.com/astral-sh/uv) |
 | **Containerization** | Docker & Docker Compose |
@@ -100,6 +100,9 @@ uv sync
 # Build the OP.GG MCP server
 cd ../opgg-mcp && npm install && npm run build && cd ..
 
+# Build the React Frontend
+cd frontend && npm install && npm run build && cd ..
+
 # Start the server
 cd backend
 uv run python main.py
@@ -140,10 +143,10 @@ Or interact with the API docs at **http://localhost:8000/docs**.
 │   ├── logs/                          # Rotating log files (auto-generated)
 │   ├── main.py                        # Local dev entrypoint
 │   └── pyproject.toml                 # Python dependencies (managed by uv)
-├── frontend/
-│   ├── index.html                     # Chat UI
-│   ├── style.css                      # Styling
-│   └── script.js                      # Frontend logic & session management
+├── frontend/                          # React + Vite Frontend
+│   ├── src/                           # React Components and Hooks
+│   ├── index.html                     # Vite Entrypoint
+│   └── package.json                   # UI Dependencies
 ├── opgg-mcp/                          # OP.GG MCP server (Node.js/TypeScript)
 ├── Dockerfile                         # Multi-stage container build
 └── docker-compose.yml                 # Service orchestration
