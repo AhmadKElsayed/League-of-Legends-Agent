@@ -13,6 +13,7 @@ function App() {
   const [particlesEnabled, setParticlesEnabled] = useState(true);
   const [activeBgName, setActiveBgName] = useState('Ryze');
   const [searchQuery, setSearchQuery] = useState('');
+  const [sessionToDelete, setSessionToDelete] = useState(null);
   
   const { messages, setMessages, isLoading, statusText, sendMessage, loadSession } = useChatStream();
   const messagesEndRef = useRef(null);
@@ -49,8 +50,15 @@ function App() {
     loadSession(id);
   };
 
-  const handleDeleteSession = async (e, id) => {
+  const handleDeleteSession = (e, id) => {
     e.stopPropagation();
+    setSessionToDelete(id);
+  };
+
+  const confirmDeleteSession = async () => {
+    if (!sessionToDelete) return;
+    const id = sessionToDelete;
+    
     try {
       await fetch(`/api/sessions/${id}`, { method: 'DELETE' });
       if (currentThreadId === id) {
@@ -60,6 +68,8 @@ function App() {
       fetchSessions();
     } catch (err) {
       console.error('Failed to delete session', err);
+    } finally {
+      setSessionToDelete(null);
     }
   };
 
@@ -232,6 +242,20 @@ function App() {
           </form>
         </main>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {sessionToDelete && (
+        <div id="custom-modal" className="custom-modal-overlay active">
+            <div className="custom-modal-content">
+                <h3 className="modal-title">Delete chat session?</h3>
+                <p className="modal-desc">Are you sure you want to delete this chat session?</p>
+                <div className="modal-actions">
+                    <button className="modal-btn confirm-btn" onClick={confirmDeleteSession}>Delete</button>
+                    <button className="modal-btn cancel-btn" onClick={() => setSessionToDelete(null)}>Cancel</button>
+                </div>
+            </div>
+        </div>
+      )}
     </>
   );
 }
