@@ -22,9 +22,13 @@ COPY opgg-mcp ./opgg-mcp
 WORKDIR /app/opgg-mcp
 RUN npm install && npm run build
 
-# 5. Move to backend and expose your API port
+# 5. Build the React Frontend
+WORKDIR /app/frontend
+RUN npm install && npm run build
+
+# 6. Move to backend and expose your API port
 WORKDIR /app/backend
 EXPOSE 8000
 
-# 6. Run the FastAPI server
+# 7. Run the FastAPI server
 CMD ["uv", "run", "uvicorn", "app.api:app", "--host", "0.0.0.0", "--port", "8000"]

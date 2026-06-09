@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hextech Intelligence Console - LoL Agent</title>
+    <!-- Google Fonts: Cinzel for premium League fantasy headers, Inter for readable body text -->
+    <link
+        href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;900&family=Inter:wght@300;400;500;600;700&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <!-- Hardware accelerated smooth background splash layers for flicker-free crossfades -->
+    <div id="bg-layer-1" class="bg-layer active"></div>
+    <div id="bg-layer-2" class="bg-layer"></div>
+
+    <!-- Deep Hextech dark blue blur overlay -->
+    <div id="overlay"></div>
+
+    <!-- Interactive magical particle canvas -->
+    <canvas id="particles-canvas"></canvas>
+
+    <div id="app-container">
+        <!-- Sidebar for Sessions -->
+        <aside id="sidebar">
+            <div class="sidebar-header">
+                <div class="brand">
+                    <div class="hextech-mini-core"></div>
+                    <h2>Hextech Agent</h2>
+                </div>
+                <button id="new-chat-btn" title="New Chat">
+                    <span class="plus-icon">+</span> New Chat
+                </button>
+            </div>
+
+            <!-- Real-time search/filter for chat histories -->
+            <div class="search-container">
+                <span class="search-icon">🔍</span>
+                <input type="text" id="session-search" placeholder="Search archives..." autocomplete="off">
+            </div>
+
+            <div id="session-list" class="session-list">
+                <!-- Sessions populated via JS -->
+            </div>
+        </aside>
+
+        <!-- Main Chat Area -->
+        <main id="chat-area">
+            <header class="chat-header">
+                <div class="header-left">
+                    <button id="sidebar-toggle" class="sidebar-toggle-btn" title="Toggle Archive Sidebar">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </button>
+                    <div class="title-container">
+                        <h3 id="current-chat-title" title="Double click to rename">Select a chat or start a new one</h3>
+                        <button id="rename-chat-btn" title="Rename Session" style="display: none;">✏️</button>
+                    </div>
+                </div>
+
+                <div class="header-actions">
+                    <!-- Particle system matrix toggle -->
+                    <button id="particles-toggle" class="header-control-btn active"
+                        title="Toggle background particle canvas">
+                        <span class="particles-icon">✨</span> Matrix On
+                    </button>
+                </div>
+            </header>
+
+            <div id="chat-messages" class="chat-messages">
+                <!-- Landing view is populated here when there are no messages -->
+                <div id="landing-view" class="landing-view">
+                    <div class="hextech-core-container">
+                        <div class="hextech-core-outer"></div>
+                        <div class="hextech-core-inner"></div>
+                        <div class="hextech-core-center"></div>
+                    </div>
+                    <h1 class="landing-title">Hextech Intelligence Console</h1>
+                    <p class="landing-subtitle">Welcome, Summoner. Powered by Runeterra Core and OP.GG match analytics.
+                        Select a query matrix or write your own.</p>
+
+                    <div class="starter-chips-container">
+                        <div class="starter-chip"
+                            data-query="What is the best build and skill order for Jinx in the current patch?">
+                            <span class="chip-emoji">⚔️</span>
+                            <div class="chip-content">
+                                <span class="chip-title">Combat Build</span>
+                                <span class="chip-desc">Optimize Jinx runes and items</span>
+                            </div>
+                        </div>
+                        <div class="starter-chip"
+                            data-query="How does Kayle survive the early lane matchup against Jax?">
+                            <span class="chip-emoji">🛡️</span>
+                            <div class="chip-content">
+                                <span class="chip-title">Matchup Strategy</span>
+                                <span class="chip-desc">Kayle vs Jax lane tactics</span>
+                            </div>
+                        </div>
+                        <div class="starter-chip"
+                            data-query="Explain the lore relationship between Aurelion Sol and the Targonian Aspect of War.">
+                            <span class="chip-emoji">📜</span>
+                            <div class="chip-content">
+                                <span class="chip-title">Runeterra Lore</span>
+                                <span class="chip-desc">Aurelion Sol's cosmic history</span>
+                            </div>
+                        </div>
+                        <div class="starter-chip"
+                            data-query="Who are the current S-tier Midlaners and what makes them strong in the meta?">
+                            <span class="chip-emoji">📈</span>
+                            <div class="chip-content">
+                                <span class="chip-title">Meta Analytics</span>
+                                <span class="chip-desc">Find top-tier mid pick rates</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="chat-input-container">
+                <input type="text" id="chat-input" placeholder="Query Runeterra archives or OP.GG profiles..."
+                    autocomplete="off" disabled>
+                <button id="send-btn" disabled>Send</button>
+            </div>
+        </main>
+    </div>
+
+    <!-- Custom Snappy Hextech Modal Overlay -->
+    <div id="custom-modal" class="custom-modal-overlay">
+        <div class="custom-modal-content">
+            <h3 class="modal-title">Delete chat session?</h3>
+            <p class="modal-desc">Are you sure you want to delete this chat session?</p>
+            <div class="modal-actions">
+                <button id="modal-confirm-btn" class="modal-btn confirm-btn">Delete</button>
+                <button id="modal-cancel-btn" class="modal-btn cancel-btn">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Custom Snappy Hextech Rename Modal -->
+    <div id="rename-modal" class="custom-modal-overlay">
+        <div class="custom-modal-content">
+            <h3 class="modal-title">Rename Archive</h3>
+            <p class="modal-desc">Enter a new name for this session.</p>
+            <input type="text" id="rename-input" class="hextech-input" placeholder="New Session Name" autocomplete="off" style="width: 100%; background: rgba(1, 10, 19, 0.7); border: 1px solid rgba(200, 155, 60, 0.2); padding: 12px 16px; color: #fff; font-size: 0.95rem; font-family: 'Inter', sans-serif; margin-bottom: 24px; box-sizing: border-box;" />
+            <div class="modal-actions">
+                <button id="rename-confirm-btn" class="modal-btn confirm-btn" style="border-color: var(--hextech-blue); color: var(--hextech-blue);">Save</button>
+                <button id="rename-cancel-btn" class="modal-btn cancel-btn">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Custom Snappy Hextech Toast Notification -->
+    <div id="custom-toast" class="custom-toast">
+        <span class="toast-icon">⚡</span>
+        <span id="toast-message" class="toast-message">Archive Purged Successfully.</span>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>

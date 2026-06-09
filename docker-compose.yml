@@ -16,6 +16,8 @@ services:
       - /app/backend/.venv
       - /app/opgg-mcp/node_modules
       - /app/opgg-mcp/dist
+      - /app/frontend/node_modules
+      - /app/frontend/dist
     restart: unless-stopped
     extra_hosts:
       - "host.docker.internal:host-gateway"

@@ -339,5 +339,11 @@ def health_check():
     return {"status": "healthy", "components": ["fastapi", "langgraph", "mcp"]}
 
 # Mount static files at root for the UI
-frontend_path = pathlib.Path(__file__).parent.parent.parent / "frontend"
+frontend_path = pathlib.Path(__file__).parent.parent.parent / "frontend" / "dist"
+
+# If running locally and dist doesn't exist yet, fallback to frontend so it doesn't crash on boot
+if not frontend_path.exists():
+    frontend_path = pathlib.Path(__file__).parent.parent.parent / "frontend"
+
+logger.info(f"Serving frontend from {frontend_path}")
 app.mount("/", StaticFiles(directory=str(frontend_path), html=True), name="static")
