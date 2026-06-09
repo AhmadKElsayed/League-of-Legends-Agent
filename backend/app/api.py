@@ -1,17 +1,16 @@
 import os
 import json
-import sqlite3
 import logging
 import logging.config
 import pathlib
-import aiosqlite
 import asyncio
 from contextlib import asynccontextmanager, AsyncExitStack
 from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
+from psycopg_pool import AsyncConnectionPool
+from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from dotenv import load_dotenv
 
 from app.agent.graph import workflow, lol_agent
@@ -78,37 +77,42 @@ logging.config.dictConfig(LOGGING_CONFIG)
 logger = logging.getLogger("lol_agent")
 
 # Global variables for async memory
-db_conn = None
+connection_pool = None
 agent = lol_agent # Default fallback
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global db_conn, agent
+    global connection_pool, agent
     exit_stack = AsyncExitStack()
+    
+    # Check for DATABASE_URL, fallback for local dev if not in docker
+    db_url = os.getenv("DATABASE_URL", "postgres://postgres:postgres@localhost:5432/agent_db")
+    
     try:
-        # Create an async connection to the SQLite DB
-        os.makedirs("data", exist_ok=True)
-        db_conn = await aiosqlite.connect("data/memory.db", check_same_thread=False)
-        await db_conn.execute("PRAGMA journal_mode=WAL;")
-        memory = AsyncSqliteSaver(db_conn)
+        connection_pool = AsyncConnectionPool(
+            conninfo=db_url,
+            max_size=20,
+            kwargs={"autocommit": True}
+        )
+        await connection_pool.open()
         
-        # This creates the checkpoints table if it doesn't exist
+        memory = AsyncPostgresSaver(connection_pool)
         await memory.setup()
         
         # Setup session metadata table for custom session names
-        await db_conn.execute("""
-            CREATE TABLE IF NOT EXISTS session_metadata (
-                thread_id TEXT PRIMARY KEY,
-                custom_name TEXT
-            )
-        """)
-        await db_conn.commit()
+        async with connection_pool.connection() as conn:
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS session_metadata (
+                    thread_id TEXT PRIMARY KEY,
+                    custom_name TEXT
+                )
+            """)
         
         # Compile the workflow with the async memory checkpointer
         agent = workflow.compile(checkpointer=memory)
-        logger.info("AsyncSqliteSaver successfully initialized.")
+        logger.info("AsyncPostgresSaver successfully initialized.")
     except Exception as e:
-        logger.error(f"Failed to initialize memory: {e}")
+        logger.error(f"Failed to initialize PostgreSQL memory: {e}")
 
     # Initialize Persistent MCP Session
     try:
@@ -149,8 +153,8 @@ async def lifespan(app: FastAPI):
         logger.info("Closing persistent database connection and MCP sessions...")
         await clear_persistent_session()
         await exit_stack.aclose()
-        if db_conn:
-            await db_conn.close()
+        if connection_pool:
+            await connection_pool.close()
         logger.info("Shutdown cleanup complete.")
 
 app = FastAPI(title="League of Legends Agent API", lifespan=lifespan)
@@ -212,23 +216,21 @@ async def chat_endpoint(request: ChatRequest):
 
 @app.get("/api/sessions")
 async def get_sessions():
-    """Fetch all unique thread IDs from the sqlite checkpointer"""
+    """Fetch all unique thread IDs from the postgres checkpointer"""
     try:
-        if not os.path.exists("data/memory.db"):
+        if not connection_pool:
             return {"sessions": []}
             
-        conn = sqlite3.connect("data/memory.db")
-        cursor = conn.cursor()
-        
-        # Extract thread IDs sorted by recency
-        cursor.execute("""
-            SELECT c.thread_id, m.custom_name
-            FROM checkpoints c
-            LEFT JOIN session_metadata m ON c.thread_id = m.thread_id
-            GROUP BY c.thread_id 
-            ORDER BY max(c.rowid) DESC
-        """)
-        rows = cursor.fetchall()
+        async with connection_pool.connection() as conn:
+            # Extract thread IDs sorted by recency
+            cursor = await conn.execute("""
+                SELECT c.thread_id, m.custom_name
+                FROM checkpoints c
+                LEFT JOIN session_metadata m ON c.thread_id = m.thread_id
+                GROUP BY c.thread_id, m.custom_name 
+                ORDER BY max(c.checkpoint_id) DESC
+            """)
+            rows = await cursor.fetchall()
         
         sessions = []
         for row in rows:
@@ -261,7 +263,6 @@ async def get_sessions():
                 logger.error(f"Error fetching state for {thread_id}: {e}")
                 sessions.append({"thread_id": thread_id, "preview": "Chat Session", "custom_name": custom_name})
                 
-        conn.close()
         return {"sessions": sessions}
     except Exception as e:
         logger.error(f"Error fetching sessions: {str(e)}")
@@ -301,34 +302,34 @@ class RenameRequest(BaseModel):
 
 @app.put("/api/sessions/{thread_id}/rename")
 async def rename_session(thread_id: str, request: RenameRequest):
-    global db_conn
+    global connection_pool
     try:
-        if db_conn:
-            await db_conn.execute("""
-                INSERT INTO session_metadata (thread_id, custom_name)
-                VALUES (?, ?)
-                ON CONFLICT(thread_id) DO UPDATE SET custom_name = excluded.custom_name
-            """, (thread_id, request.name))
-            await db_conn.commit()
+        if connection_pool:
+            async with connection_pool.connection() as conn:
+                await conn.execute("""
+                    INSERT INTO session_metadata (thread_id, custom_name)
+                    VALUES (%s, %s)
+                    ON CONFLICT(thread_id) DO UPDATE SET custom_name = EXCLUDED.custom_name
+                """, (thread_id, request.name))
             return {"status": "success", "custom_name": request.name}
         else:
-            raise Exception("Database connection not initialized")
+            raise Exception("Database connection pool not initialized")
     except Exception as e:
         logger.error(f"Error renaming session {thread_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.delete("/api/sessions/{thread_id}")
 async def delete_session(thread_id: str):
-    global db_conn
+    global connection_pool
     try:
-        if db_conn:
-            await db_conn.execute("DELETE FROM checkpoints WHERE thread_id = ?", (thread_id,))
-            await db_conn.execute("DELETE FROM writes WHERE thread_id = ?", (thread_id,))
-            await db_conn.execute("DELETE FROM session_metadata WHERE thread_id = ?", (thread_id,))
-            await db_conn.commit()
+        if connection_pool:
+            async with connection_pool.connection() as conn:
+                await conn.execute("DELETE FROM checkpoints WHERE thread_id = %s", (thread_id,))
+                await conn.execute("DELETE FROM writes WHERE thread_id = %s", (thread_id,))
+                await conn.execute("DELETE FROM session_metadata WHERE thread_id = %s", (thread_id,))
             return {"status": "success"}
         else:
-            raise Exception("Database connection not initialized")
+            raise Exception("Database connection pool not initialized")
     except Exception as e:
         logger.error(f"Error deleting session {thread_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))

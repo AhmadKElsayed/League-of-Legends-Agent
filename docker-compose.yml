@@ -8,15 +8,29 @@ services:
     environment:
       - GEMINI_API_KEY=${GEMINI_API_KEY}
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - DATABASE_URL=postgres://postgres:postgres@postgres:5432/agent_db
+    depends_on:
+      - postgres
     volumes:
       - .:/app
       - /app/backend/.venv
       - /app/opgg-mcp/node_modules
       - /app/opgg-mcp/dist
-      - sqlite_data:/app/backend/data
     restart: unless-stopped
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
+  postgres:
+    image: postgres:17-alpine
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: agent_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
 volumes:
-  sqlite_data:
+  postgres_data:

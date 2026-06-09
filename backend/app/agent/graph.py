@@ -1,6 +1,4 @@
 from langgraph.graph import StateGraph, START, END
-import sqlite3
-from langgraph.checkpoint.sqlite import SqliteSaver
 from app.agent.state import AgentState
 from app.agent.nodes.supervisor import supervisor_node
 from app.agent.nodes.research_worker import research_worker_node

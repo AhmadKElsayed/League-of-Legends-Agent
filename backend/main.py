@@ -2,12 +2,18 @@ import uvicorn
 import os
 import webbrowser
 import threading
+import asyncio
+import sys
 from dotenv import load_dotenv
 
 def open_browser():
     webbrowser.open("http://127.0.0.1:8000/")
 
 if __name__ == "__main__":
+
+    if sys.platform == "win32":
+        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+        
     import pathlib
     dotenv_path = pathlib.Path(__file__).parent.parent / ".env"
     load_dotenv(dotenv_path=dotenv_path)
