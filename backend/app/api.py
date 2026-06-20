@@ -92,7 +92,8 @@ async def lifespan(app: FastAPI):
         connection_pool = AsyncConnectionPool(
             conninfo=db_url,
             max_size=20,
-            kwargs={"autocommit": True}
+            kwargs={"autocommit": True},
+            open=False
         )
         await connection_pool.open()
         
