@@ -84,7 +84,24 @@ export const proxyServer = async ({
     });
 
     server.setRequestHandler(ListToolsRequestSchema, async (args) => {
-      return client.listTools(args.params);
+      // Bypass Zod validation by using a dummy schema
+      const anySchema = {
+        _def: {},
+        parse: (data: any) => data,
+        safeParse: (data: any) => ({ success: true, data })
+      } as any;
+      const response = await client.request(
+        { method: "tools/list", params: args.params },
+        anySchema
+      ) as any;
+      if (response && response.tools) {
+        for (const tool of response.tools) {
+          if ('outputSchema' in tool) {
+            delete (tool as any).outputSchema;
+          }
+        }
+      }
+      return response;
     });
   }
 
