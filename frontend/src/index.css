@@ -1215,3 +1215,41 @@ body {
 @keyframes toolSpin {
   to { transform: rotate(360deg); }
 }
+
+/* --- CUSTOM SNAPPY HEXTECH TOAST --- */
+.custom-toast {
+  position: fixed;
+  bottom: 40px;
+  left: 50%;
+  transform: translateX(-50%) translateY(100px);
+  background: rgba(1, 10, 19, 0.95);
+  border: 1px solid var(--hextech-blue);
+  box-shadow: 0 0 20px var(--hextech-blue-glowing);
+  padding: 12px 24px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  z-index: 10000;
+  opacity: 0;
+  pointer-events: none;
+  transition: all 0.12s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+.custom-toast.active {
+  transform: translateX(-50%) translateY(0);
+  opacity: 1;
+}
+
+.toast-icon {
+  font-size: 1.1rem;
+  color: var(--hextech-blue);
+  text-shadow: 0 0 5px var(--hextech-blue);
+}
+
+.toast-message {
+  font-family: 'Cinzel', serif;
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  color: var(--text-primary);
+}

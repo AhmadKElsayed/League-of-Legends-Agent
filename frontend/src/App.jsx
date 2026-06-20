@@ -14,6 +14,18 @@ function App() {
   const [activeBgName, setActiveBgName] = useState('Ryze');
   const [searchQuery, setSearchQuery] = useState('');
   const [sessionToDelete, setSessionToDelete] = useState(null);
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [editTitleValue, setEditTitleValue] = useState('');
+  const [toastMessage, setToastMessage] = useState(null);
+  const [editingSidebarId, setEditingSidebarId] = useState(null);
+  const [sidebarEditValue, setSidebarEditValue] = useState('');
+
+  const showToast = (message) => {
+    setToastMessage(message);
+    setTimeout(() => {
+      setToastMessage(null);
+    }, 3000);
+  };
   
   const { messages, setMessages, isLoading, statusText, sendMessage, loadSession } = useChatStream();
   const messagesEndRef = useRef(null);
@@ -66,6 +78,7 @@ function App() {
         setMessages([]);
       }
       fetchSessions();
+      showToast("Archive Purged Successfully.");
     } catch (err) {
       console.error('Failed to delete session', err);
     } finally {
@@ -86,6 +99,47 @@ function App() {
     const currentInput = input;
     setInput('');
     sendMessage(currentInput, targetThreadId);
+  };
+
+  const handleRenameSubmit = async () => {
+    if (!currentThreadId) return;
+    const newName = editTitleValue.trim();
+    if (!newName) {
+      setIsEditingTitle(false);
+      return;
+    }
+
+    try {
+      await fetch(`/api/sessions/${currentThreadId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ custom_name: newName })
+      });
+      fetchSessions();
+      showToast("Archive Renamed Successfully.");
+    } catch (err) {
+      console.error('Failed to rename session', err);
+    } finally {
+      setIsEditingTitle(false);
+    }
+  };
+
+  const handleSidebarRenameSubmit = async (threadId) => {
+    const newName = sidebarEditValue.trim();
+    setEditingSidebarId(null);
+    if (!newName) return;
+
+    try {
+      await fetch(`/api/sessions/${threadId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ custom_name: newName })
+      });
+      fetchSessions();
+      showToast("Archive Renamed Successfully.");
+    } catch (err) {
+      console.error('Failed to rename session', err);
+    }
   };
 
   const currentSession = sessions.find(s => s.thread_id === currentThreadId);
@@ -132,10 +186,40 @@ function App() {
                 key={session.thread_id} 
                 className={`session-item ${session.thread_id === currentThreadId ? 'active' : ''}`}
                 onClick={() => handleSelectSession(session.thread_id)}
+                onDoubleClick={() => {
+                  setEditingSidebarId(session.thread_id);
+                  setSidebarEditValue(session.custom_name || session.preview);
+                }}
               >
-                <div className="session-preview" title={session.custom_name || session.preview}>
-                  {session.custom_name || session.preview}
-                </div>
+                {editingSidebarId === session.thread_id ? (
+                  <input
+                    type="text"
+                    value={sidebarEditValue}
+                    onChange={(e) => setSidebarEditValue(e.target.value)}
+                    onBlur={() => handleSidebarRenameSubmit(session.thread_id)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleSidebarRenameSubmit(session.thread_id);
+                      if (e.key === 'Escape') setEditingSidebarId(null);
+                    }}
+                    autoFocus
+                    onClick={(e) => e.stopPropagation()}
+                    style={{
+                      width: '100%',
+                      background: 'rgba(1, 10, 19, 0.7)',
+                      border: '1px solid rgba(200, 155, 60, 0.2)',
+                      padding: '4px 8px',
+                      color: '#fff',
+                      fontSize: '0.9rem',
+                      fontFamily: 'inherit',
+                      outline: 'none',
+                      marginRight: '20px'
+                    }}
+                  />
+                ) : (
+                  <div className="session-preview" title={session.custom_name || session.preview}>
+                    {session.custom_name || session.preview}
+                  </div>
+                )}
                 <button 
                   className="delete-btn" 
                   title="Delete Archive"
@@ -154,7 +238,51 @@ function App() {
                       <span></span><span></span><span></span>
                   </button>
                   <div className="title-container">
-                      <h3 id="current-chat-title">{chatTitle}</h3>
+                      {isEditingTitle ? (
+                        <input 
+                          type="text" 
+                          value={editTitleValue}
+                          onChange={(e) => setEditTitleValue(e.target.value)}
+                          onBlur={handleRenameSubmit}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') handleRenameSubmit();
+                            if (e.key === 'Escape') setIsEditingTitle(false);
+                          }}
+                          autoFocus
+                          style={{
+                            background: 'var(--glass-bg-dense)',
+                            border: '1px solid var(--hextech-blue)',
+                            color: 'white',
+                            padding: '4px 8px',
+                            borderRadius: '4px',
+                            fontSize: '1rem',
+                            fontFamily: 'inherit',
+                            outline: 'none',
+                            width: '250px'
+                          }}
+                        />
+                      ) : (
+                        <>
+                          <h3 id="current-chat-title" onDoubleClick={() => {
+                            if (currentSession) {
+                              setEditTitleValue(chatTitle);
+                              setIsEditingTitle(true);
+                            }
+                          }} title={currentSession ? "Double click to rename" : ""}>{chatTitle}</h3>
+                          {currentSession && (
+                            <button 
+                              id="rename-chat-btn" 
+                              title="Rename Session" 
+                              onClick={() => {
+                                setEditTitleValue(chatTitle);
+                                setIsEditingTitle(true);
+                              }}
+                            >
+                              ✏️
+                            </button>
+                          )}
+                        </>
+                      )}
                   </div>
               </div>
 
@@ -256,6 +384,12 @@ function App() {
             </div>
         </div>
       )}
+
+      {/* Toast Notification */}
+      <div id="custom-toast" className={`custom-toast ${toastMessage ? 'active' : ''}`}>
+          <span className="toast-icon">⚡</span>
+          <span id="toast-message" className="toast-message">{toastMessage}</span>
+      </div>
     </>
   );
 }
