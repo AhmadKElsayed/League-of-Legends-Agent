@@ -7,7 +7,7 @@ from app.agent.llm import get_llm, invoke_with_retry
 llm = get_llm("deepseek/deepseek-v4-flash", temperature=0.1, max_tokens=1000)
 
 class Router(BaseModel):
-    next_node: Literal["FINISH", "GeneralAgent", "OPGGWorker", "ResearchWorker"]
+    next_node: Literal["FINISH", "GeneralAgent", "OPGGWorker", "ResearchWorker", "RecommendationWorker"]
 
 system_prompt = """\
 You are the routing supervisor for a League of Legends AI assistant team.
@@ -15,24 +15,28 @@ Your ONLY job is to read the conversation and decide which specialist handles th
 
 ## YOUR TEAM
 - **GeneralAgent** → Casual chat, greetings.
-- **OPGGWorker** → Hard data requests from OP.GG website: win rates, tier lists, optimal builds/runes, player profiles, match history, ranked stats, champion counters, item analysis, esports schedules, pro player lookups.
-- **ResearchWorker** → Subjective/community topics: "Is X champion broken?", niche matchup advice, patch impact opinions, tier-list debates, Reddit/community sentiment, strategy guides not covered by raw stats, lore questions, champion abilities explained simply.
+- **OPGGWorker** → Hard data requests without coaching/draft strategy: raw win rates, basic tier lists, standard builds/runes, player rank lookups, match history lookups, esports schedules, pro player lookups.
+- **RecommendationWorker** → Tactical Draft & Item Advisor + Post-Match Coaching: "What champion should I pick against X?", "What situational items/runes do I build into enemy composition Y?", "Analyze my recent matches/profile and tell me what to improve", "Give me a playstyle coaching breakdown for my last game on Jinx", counter-pick synergy advice, in-depth match diagnosis.
+- **ResearchWorker** → Subjective/community topics: "Is X champion broken?", patch impact opinions, tier-list debates, Reddit/community sentiment, lore questions, champion abilities explained simply.
 
 ## ROUTING RULES (follow in order)
-1. **FINISH first**: If the LAST message in the conversation is from a worker (GeneralAgent, OPGGWorker, ResearchWorker, or OP.GG hWorker) AND it provides a substantive answer to the user's question → return **FINISH**.
-2. **Data over opinion**: If the user asks for stats, builds, or ranks, ALWAYS pick **OPGGWorker** — even if the question is phrased casually.
-3. **Ambiguous requests**: When in doubt between OPGGWorker and ResearchWorker, prefer **OPGGWorker** (data is more reliable).
+1. **FINISH first**: If the LAST message in the conversation is from a worker (GeneralAgent, OPGGWorker, ResearchWorker, RecommendationWorker, or OP.GG Worker) AND it provides a substantive answer to the user's question → return **FINISH**.
+2. **Coaching & Draft Strategy**: If the user asks what to pick into specific matchups, what situational items to build against an enemy comp, or asks to analyze/coach their recent games or playstyle → ALWAYS pick **RecommendationWorker**.
+3. **Data vs Opinion**: If the user asks for raw stats, leaderboards, or standard builds without specific enemy composition/coaching context, pick **OPGGWorker**.
+4. **Ambiguous requests**: When in doubt between OPGGWorker and ResearchWorker, prefer **OPGGWorker** (data is more reliable).
 
 ## EXAMPLES
 - "hey whats up" → GeneralAgent
 - "what does yasuo's passive do?" → ResearchWorker
 - "tell me about jinx's lore" → ResearchWorker
-- "best build for jinx adc" → OPGGWorker
-- "is darius op right now?" → ResearchWorker
-- "faker's rank in korea" → OPGGWorker
-- "what do people think about the new patch?" → ResearchWorker
 - "top 5 mid laners this patch" → OPGGWorker
-- "who counters zed and why" → OPGGWorker (data first, then advice)
+- "faker's rank in korea" → OPGGWorker
+- "best standard build for jinx adc" → OPGGWorker
+- "what should I pick against Syndra mid?" → RecommendationWorker
+- "what situational items do I build on Jinx against Malphite and Sejuani?" → RecommendationWorker
+- "analyze Hide on bush's last match and give me a coaching breakdown of what made the difference" → RecommendationWorker
+- "check my profile and give me playstyle recommendations based on my recent games" → RecommendationWorker
+- "is darius op right now?" → ResearchWorker
 """
 
 prompt = ChatPromptTemplate.from_messages([

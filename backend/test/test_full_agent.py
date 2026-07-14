@@ -9,6 +9,7 @@ from langgraph.checkpoint.memory import MemorySaver
 import operator
 from typing import TypedDict, Annotated, Sequence
 from app.agent.nodes.opgg_worker import opgg_worker_node
+from app.agent.nodes.recommendation_worker import recommendation_worker_node
 from app.agent.nodes.research_worker import research_worker_node
 from app.agent.nodes.supervisor import supervisor_node
 
@@ -41,6 +42,7 @@ async def main():
     builder.add_node("Supervisor", supervisor_node)
     builder.add_node("GeneralAgent", general_agent_node)
     builder.add_node("OPGGWorker", opgg_worker_node)
+    builder.add_node("RecommendationWorker", recommendation_worker_node)
     builder.add_node("ResearchWorker", research_worker_node)
 
     # 1. Everything starts at the Supervisor
@@ -57,6 +59,7 @@ async def main():
         {
             "GeneralAgent": "GeneralAgent",
             "OPGGWorker": "OPGGWorker",
+            "RecommendationWorker": "RecommendationWorker",
             "ResearchWorker": "ResearchWorker",
             "FINISH": END
         }
@@ -65,6 +68,7 @@ async def main():
     # 3. After a worker finishes, it must report back to the Supervisor
     builder.add_edge("GeneralAgent", END)
     builder.add_edge("OPGGWorker", END)
+    builder.add_edge("RecommendationWorker", END)
     builder.add_edge("ResearchWorker", END)
 
     # 4. Add Memory (Checkpointer) so it remembers your lane!

@@ -3,6 +3,7 @@ from app.agent.state import AgentState
 from app.agent.nodes.supervisor import supervisor_node
 from app.agent.nodes.research_worker import research_worker_node
 from app.agent.nodes.opgg_worker import opgg_worker_node
+from app.agent.nodes.recommendation_worker import recommendation_worker_node
 from app.agent.nodes.general import general_agent_node
 
 def create_graph():
@@ -12,6 +13,7 @@ def create_graph():
     workflow.add_node("Supervisor", supervisor_node)
     workflow.add_node("GeneralAgent", general_agent_node)
     workflow.add_node("OPGGWorker", opgg_worker_node)
+    workflow.add_node("RecommendationWorker", recommendation_worker_node)
     workflow.add_node("ResearchWorker", research_worker_node)
 
     # 1. Everything starts at the Supervisor
@@ -28,6 +30,7 @@ def create_graph():
         {
             "GeneralAgent": "GeneralAgent",
             "OPGGWorker": "OPGGWorker",
+            "RecommendationWorker": "RecommendationWorker",
             "ResearchWorker": "ResearchWorker",
             "FINISH": END
         }
@@ -35,6 +38,7 @@ def create_graph():
 
     workflow.add_edge("GeneralAgent", END)
     workflow.add_edge("OPGGWorker", END)
+    workflow.add_edge("RecommendationWorker", END)
     workflow.add_edge("ResearchWorker", END)
     return workflow
 

@@ -19,7 +19,8 @@ from app.agent_logger import log_session_header, log_session_footer
 
 from langchain_mcp_adapters.client import MultiServerMCPClient
 from langchain_mcp_adapters.tools import load_mcp_tools
-from app.agent.nodes.opgg_worker import set_persistent_session, clear_persistent_session
+from app.agent.nodes.opgg_worker import set_persistent_session as set_opgg_session, clear_persistent_session as clear_opgg_session
+from app.agent.nodes.recommendation_worker import set_persistent_session as set_rec_session, clear_persistent_session as clear_rec_session
 
 dotenv_path = pathlib.Path(__file__).parent.parent.parent / ".env"
 load_dotenv(dotenv_path=dotenv_path)
@@ -139,9 +140,10 @@ async def lifespan(app: FastAPI):
             
             # Pre-load tools
             all_tools = await load_mcp_tools(session)
-            lol_tools = [t for t in all_tools if t.name.startswith("lol_")]
+            lol_tools = [t for t in all_tools if t.name.startswith("lol_") or t.name.startswith("tft_")]
             
-            await set_persistent_session(session, mcp_client, lol_tools)
+            await set_opgg_session(session, mcp_client, lol_tools)
+            await set_rec_session(session, mcp_client, lol_tools)
             logger.info(f"Persistent MCP session successfully initialized with {len(lol_tools)} tools.")
         else:
             logger.warning("OPGG MCP server path not found. Persistent MCP session skipped.")
@@ -152,7 +154,8 @@ async def lifespan(app: FastAPI):
         yield
     finally:
         logger.info("Closing persistent database connection and MCP sessions...")
-        await clear_persistent_session()
+        await clear_opgg_session()
+        await clear_rec_session()
         await exit_stack.aclose()
         if connection_pool:
             await connection_pool.close()
@@ -188,7 +191,7 @@ async def chat_endpoint(request: ChatRequest):
                 
                 # 2. Yield token streams from the active worker generating answer text
                 elif kind == "on_chat_model_stream":
-                    if node in ["GeneralAgent", "OPGGWorker", "ResearchWorker"]:
+                    if node in ["GeneralAgent", "OPGGWorker", "ResearchWorker", "RecommendationWorker"]:
                         chunk = event["data"]["chunk"]
                         if chunk.content:
                             accumulated_text += chunk.content
