@@ -24,16 +24,19 @@ graph TD
     API --> Supervisor[Supervisor]
 
     Supervisor -->|Champion Stats| OPGGWorker[OP.GG Worker]
+    Supervisor -->|Draft & Coaching| RecommendationWorker[Recommendation Worker]
     Supervisor -->|Meta Research| ResearchWorker[Research Worker]
     Supervisor -->|General Chat| GeneralAgent[General Agent]
     Supervisor -->|Done| END((END))
 
     OPGGWorker --> END
+    RecommendationWorker --> END
     ResearchWorker --> END
     GeneralAgent --> END
 
     subgraph "External Tools"
         OPGGWorker --- MCP[OP.GG MCP Server]
+        RecommendationWorker --- MCP
         ResearchWorker --- Tavily[Tavily Search API]
     end
 ```
@@ -44,6 +47,7 @@ graph TD
 |---|---|
 | **Supervisor** | Analyzes user intent and routes to the appropriate specialist using structured output |
 | **OP.GG Worker** | Fetches live champion stats, win rates, builds, and player profiles via a local MCP server |
+| **Recommendation Worker** | Acts as the Hextech AI Coach & Draft Strategist. Delivers situational champion picks, item counters, and post-match playstyle diagnostics (`lol_get_summoner_game_detail`, `lol_list_summoner_matches`) via the OP.GG MCP server |
 | **Research Worker** | Performs web research using Tavily to synthesize patch notes, tier lists, and community sentiment |
 | **General Agent** | Handles casual conversation, greetings, and game lore questions |
 
@@ -122,6 +126,9 @@ docker compose exec agent-api uv run test/test_full_agent.py
 
 # OP.GG worker test
 docker compose exec agent-api uv run test/test_opgg_node.py
+
+# Recommendation worker test
+docker compose exec agent-api uv run test/test_recommendation_node.py
 
 # Research worker test
 docker compose exec agent-api uv run test/test_research_node.py
