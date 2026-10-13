@@ -20,7 +20,6 @@ from app.agent_logger import log_session_header, log_session_footer
 from langchain_mcp_adapters.client import MultiServerMCPClient
 from langchain_mcp_adapters.tools import load_mcp_tools
 from app.agent.nodes.opgg_worker import set_persistent_session as set_opgg_session, clear_persistent_session as clear_opgg_session
-from app.agent.nodes.recommendation_worker import set_persistent_session as set_rec_session, clear_persistent_session as clear_rec_session
 
 dotenv_path = pathlib.Path(__file__).parent.parent.parent / ".env"
 load_dotenv(dotenv_path=dotenv_path)
@@ -143,7 +142,6 @@ async def lifespan(app: FastAPI):
             lol_tools = [t for t in all_tools if t.name.startswith("lol_") or t.name.startswith("tft_")]
             
             await set_opgg_session(session, mcp_client, lol_tools)
-            await set_rec_session(session, mcp_client, lol_tools)
             logger.info(f"Persistent MCP session successfully initialized with {len(lol_tools)} tools.")
         else:
             logger.warning("OPGG MCP server path not found. Persistent MCP session skipped.")
@@ -155,7 +153,6 @@ async def lifespan(app: FastAPI):
     finally:
         logger.info("Closing persistent database connection and MCP sessions...")
         await clear_opgg_session()
-        await clear_rec_session()
         await exit_stack.aclose()
         if connection_pool:
             await connection_pool.close()
@@ -170,51 +167,72 @@ class ChatRequest(BaseModel):
 class ChatResponse(BaseModel):
     response: str
 
+# Graph nodes the UI knows about. Used to filter status events down to real node
+# transitions — astream_events also reports inner runnables that inherit a
+# langgraph_node in their metadata.
+NODE_NAMES = {"Supervisor", "GeneralAgent", "OPGGWorker", "ResearchWorker", "Synthesizer"}
+WORKER_NODES = NODE_NAMES - {"Supervisor", "Synthesizer"}
+
+def _sse(kind: str, payload: dict) -> str:
+    return f"event: {kind}\ndata: {json.dumps(payload)}\n\n"
+
 @app.post("/chat")
 async def chat_endpoint(request: ChatRequest):
     log_session_header(request.thread_id, request.message)
     initial_state = {"messages": [HumanMessage(content=request.message)]}
     config = {"configurable": {"thread_id": request.thread_id}}
-    
+
     async def event_generator():
         accumulated_text = ""
+        # Set from the Supervisor's plan. Its on_chain_end fires in the superstep
+        # before any worker starts, so this is always known in time.
+        fanout = False
         try:
             async for event in agent.astream_events(initial_state, config, version="v2"):
                 kind = event["event"]
                 name = event["name"]
                 metadata = event.get("metadata", {})
                 node = metadata.get("langgraph_node")
-                
-                # 1. Yield active node changes for status updates
-                if kind == "on_chain_start" and node:
-                    yield f"event: status\ndata: {json.dumps({'node': node})}\n\n"
-                
-                # 2. Yield token streams from the active worker generating answer text
+
+                # 1. Announce the Supervisor's dispatch plan so the UI can show
+                #    which specialists are working.
+                if kind == "on_chain_end" and node == "Supervisor":
+                    output = event["data"].get("output")
+                    if isinstance(output, dict) and output.get("plan"):
+                        fanout = bool(output.get("fanout"))
+                        yield _sse("plan", {"workers": [t["worker"] for t in output["plan"]]})
+
+                # 2. Node transitions, for progress display
+                if kind in ("on_chain_start", "on_chain_end") and name in NODE_NAMES:
+                    phase = "start" if kind == "on_chain_start" else "end"
+                    yield _sse("status", {"node": name, "state": phase})
+
+                # 3. Token stream. Under fan-out several workers generate at once,
+                #    so only the Synthesizer's merged answer is forwarded —
+                #    otherwise the streams interleave character by character.
                 elif kind == "on_chat_model_stream":
-                    if node in ["GeneralAgent", "OPGGWorker", "ResearchWorker", "RecommendationWorker"]:
+                    if node in ({"Synthesizer"} if fanout else WORKER_NODES):
                         chunk = event["data"]["chunk"]
                         if chunk.content:
                             accumulated_text += chunk.content
-                            yield f"event: token\ndata: {json.dumps({'text': chunk.content})}\n\n"
-                            
-                # 3. Yield tool execution logs
+                            yield _sse("token", {"text": chunk.content})
+
+                # 4. Tool execution logs
                 elif kind == "on_tool_start":
-                    tool_name = name
-                    yield f"event: tool_log\ndata: {json.dumps({'status': 'start', 'tool': tool_name})}\n\n"
-                    
+                    yield _sse("tool_log", {"status": "start", "tool": name})
+
                 elif kind == "on_tool_end":
-                    tool_name = name
-                    yield f"event: tool_log\ndata: {json.dumps({'status': 'end', 'tool': tool_name})}\n\n"
-            
+                    yield _sse("tool_log", {"status": "end", "tool": name})
+
             log_session_footer(request.thread_id, accumulated_text)
-            yield "event: done\ndata: {}\n\n"
-            
+            yield _sse("done", {})
+
         except asyncio.CancelledError:
             logger.info(f"Session {request.thread_id} - Client disconnected during stream.")
             raise
         except Exception as e:
             logger.exception(f"Session {request.thread_id} - Streaming Error:")
-            yield f"event: error\ndata: {json.dumps({'error': str(e)})}\n\n"
+            yield _sse("error", {"error": str(e)})
             
     return StreamingResponse(event_generator(), media_type="text/event-stream")
 
@@ -327,10 +345,15 @@ async def delete_session(thread_id: str):
     global connection_pool
     try:
         if connection_pool:
+            # The pool runs with autocommit, so without an explicit transaction a
+            # failure partway through would leave the session half-deleted.
             async with connection_pool.connection() as conn:
-                await conn.execute("DELETE FROM checkpoints WHERE thread_id = %s", (thread_id,))
-                await conn.execute("DELETE FROM writes WHERE thread_id = %s", (thread_id,))
-                await conn.execute("DELETE FROM session_metadata WHERE thread_id = %s", (thread_id,))
+                async with conn.transaction():
+                    # Tables created by AsyncPostgresSaver.setup(). Children first.
+                    await conn.execute("DELETE FROM checkpoint_writes WHERE thread_id = %s", (thread_id,))
+                    await conn.execute("DELETE FROM checkpoint_blobs WHERE thread_id = %s", (thread_id,))
+                    await conn.execute("DELETE FROM checkpoints WHERE thread_id = %s", (thread_id,))
+                    await conn.execute("DELETE FROM session_metadata WHERE thread_id = %s", (thread_id,))
             return {"status": "success"}
         else:
             raise Exception("Database connection pool not initialized")

@@ -1,11 +1,13 @@
 import os
 import pathlib
-from langchain_core.messages import SystemMessage, ToolMessage, AIMessage
+from langchain_core.messages import SystemMessage, ToolMessage, AIMessage, HumanMessage
 from langchain_mcp_adapters.client import MultiServerMCPClient
 from langchain_mcp_adapters.tools import load_mcp_tools
 from dotenv import load_dotenv
 from app.agent_logger import log_llm_response, log_tool_result
 from app.agent.llm import get_llm, invoke_with_retry
+from app.agent.prompts import with_subtask, FINAL_SYNTHESIS_INSTRUCTION, OPGG_OUTPUT_FORMAT
+from app.agent.state import worker_return
 
 load_dotenv()
 
@@ -32,7 +34,7 @@ async def _execute_agent_loop(messages, lol_tools, tool_map, agent_with_tools, n
     new_messages = []
     
     # --- SELF-CORRECTION LOOP ---
-    max_retries = 3
+    max_retries = 5
     attempts = 0
     
     while attempts < max_retries:
@@ -71,10 +73,13 @@ async def _execute_agent_loop(messages, lol_tools, tool_map, agent_with_tools, n
             new_messages.append(tool_msg)
             log_tool_result(node_name, tool_call["name"], tool_call["id"], content)
             
-        # If this is the last attempt and we executed tool calls, we must do a final text synthesis
+        # Out of tool calls: tell the model so explicitly, then have it answer from
+        # what it gathered. Without the instruction it keeps trying to call tools and,
+        # with no schema bound here, writes the call into the content as raw markup.
         if attempts + 1 == max_retries:
+            final_messages = messages + [HumanMessage(content=FINAL_SYNTHESIS_INSTRUCTION)]
             try:
-                final_response = await invoke_with_retry(llm, messages)
+                final_response = await invoke_with_retry(llm, final_messages)
             except Exception as e:
                 final_response = AIMessage(content=f"An internal error occurred in final synthesis: {e}", name="OPGGWorker")
             if isinstance(final_response, AIMessage):
@@ -100,10 +105,10 @@ async def opgg_worker_node(state):
     opgg_server_path = next((p for p in possible_paths if p and pathlib.Path(p).exists()), None)
     
     if not opgg_server_path:
-        return {"messages": [AIMessage(content="⚠️ OPGG Worker Error: The MCP server entry point ('opgg-mcp/dist/index.js' or '../opgg-mcp/dist/index.js') was not found. If running locally, please run 'npm install && npm run build' inside the 'opgg-mcp' directory.", name="OPGGWorker")]}
+        return worker_return(state, "OPGGWorker", [AIMessage(content="⚠️ OPGG Worker Error: The MCP server entry point ('opgg-mcp/dist/index.js' or '../opgg-mcp/dist/index.js') was not found. If running locally, please run 'npm install && npm run build' inside the 'opgg-mcp' directory.", name="OPGGWorker")])
 
     # 2. Supercharged Persona for Multi-Tool Use
-    system_msg = SystemMessage(content="""\
+    system_msg = SystemMessage(content=with_subtask("""\
 You are the **OP.GG Data Analyst**, a precision-focused League of Legends statistics engine.
 Your job is to retrieve accurate data using your OPGG tools and present it in a clean, actionable format.
 
@@ -139,21 +144,19 @@ Your job is to retrieve accurate data using your OPGG tools and present it in a 
 1. **REGION**: If the user does NOT specify a region for profile/match lookups, you MUST ask them. Valid regions: KR, NA, EUW, EUNE, OCE, BR, LAN, LAS, TR, RU, JP, PH, SG, TH, TW, VN.
 2. **DESIRED OUTPUT FIELDS**: This is a CLOSED SET — read each tool's description carefully and only request fields that exist in the schema (e.g., `data.summary.average_stats.win_rate`). Never guess field paths.
 3. **CHAMPION NAMES**: Always use UPPER_SNAKE_CASE (e.g., `LEE_SIN`, `TWISTED_FATE`, `MISS_FORTUNE`).
-4. **POSITION VALUES**: Use exactly one of: `"TOP"`, `"JUNGLE"`, `"MID"`, `"ADC"`, `"SUPPORT"`.
-5. **TOOL SELECTION**: Always pick the most specific tool for the job. Don't use `lol_search_champion_meta` when `lol_get_champion_analysis` will work.
+4. **POSITION VALUES**: **lowercase** — exactly one of `"top"`, `"jungle"`, `"mid"`, `"adc"`, `"support"`.
+   The schema also lists `"all"` and `"none"`, but `lol_get_champion_analysis` **rejects both** with
+   "The selected position is invalid" — always name a concrete lane there.
+5. **FINDING A CHAMPION'S MAIN ROLE**: You cannot ask `lol_get_champion_analysis` which role is most
+   popular; it needs the lane up front. Either infer the obvious lane and query it directly, or call
+   `lol_list_lane_meta_champions` (which does accept `"all"`) and read the champion's `play` counts.
+   Do not burn calls probing one lane at a time.
+6. **TOOL SELECTION**: Always pick the most specific tool for the job. Don't use `lol_search_champion_meta` when `lol_get_champion_analysis` will work.
 
-## OUTPUT FORMATTING
-- Present data in **clean Markdown** with headers, bullet points, and bold key numbers.
-- For builds: show items as an ordered list with item names bolded.
-- For stats: always include **win rate**, **pick rate**, and **sample size** when available.
-- For player profiles: format as a summary card with rank, top champions, and recent performance.
-- Round percentages to 1 decimal place (e.g., 52.3%, not 52.2847%).
-- Add a brief ⚠️ disclaimer if the sample size is very small (<1000 games) — stats may not be reliable.
-- End with a **one-sentence takeaway** that gives the user an actionable insight.
-""")
+""" + OPGG_OUTPUT_FORMAT, state.get("task")))
 
     node_name = "OP.GG Worker"
-    messages = [system_msg] + state["messages"]
+    messages = [system_msg] + list(state["messages"])
 
     if mcp_session is not None:
         tool_map = {tool.name: tool for tool in mcp_tools}
@@ -173,5 +176,5 @@ Your job is to retrieve accurate data using your OPGG tools and present it in a 
             tool_map = {tool.name: tool for tool in lol_tools}
             agent_with_tools = llm.bind_tools(lol_tools)
             new_messages = await _execute_agent_loop(messages, lol_tools, tool_map, agent_with_tools, node_name)
-            
-    return {"messages": new_messages}
+
+    return worker_return(state, "OPGGWorker", new_messages)

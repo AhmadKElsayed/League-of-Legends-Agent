@@ -1216,6 +1216,41 @@ body {
   to { transform: rotate(360deg); }
 }
 
+/* --- PARALLEL SPECIALIST PROGRESS (fan-out turns) --- */
+.worker-progress-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 14px;
+}
+
+.worker-progress-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  transition: color 0.2s ease;
+}
+
+.worker-progress-item.running {
+  color: var(--hextech-blue);
+}
+
+.worker-progress-item.done {
+  color: var(--text-secondary);
+  opacity: 0.65;
+}
+
+.worker-progress-icon {
+  flex-shrink: 0;
+  width: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
 /* --- CUSTOM SNAPPY HEXTECH TOAST --- */
 .custom-toast {
   position: fixed;

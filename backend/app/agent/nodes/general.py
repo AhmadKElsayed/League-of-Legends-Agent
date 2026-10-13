@@ -1,5 +1,7 @@
 from langchain_core.messages import SystemMessage
 from app.agent.llm import get_llm, invoke_with_retry
+from app.agent.prompts import with_subtask
+from app.agent.state import worker_return
 from app.agent_logger import log_llm_response
 
 llm = get_llm("deepseek/deepseek-v4-flash", temperature=0.4, max_tokens=1000)
@@ -30,11 +32,11 @@ You are **Nexus**, a charismatic League of Legends companion.
 """
 
 async def general_agent_node(state):
-    system_message = SystemMessage(content=SYSTEM_PROMPT)
-    
+    system_message = SystemMessage(content=with_subtask(SYSTEM_PROMPT, state.get("task")))
+
     # Combine it cleanly with the state messages
     messages = [system_message] + list(state["messages"])
-    
+
     response = await invoke_with_retry(llm, messages)
     log_llm_response("GeneralAgent", response)
-    return {"messages": [response]}
+    return worker_return(state, "GeneralAgent", [response])

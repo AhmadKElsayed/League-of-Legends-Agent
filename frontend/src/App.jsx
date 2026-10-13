@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { useChatStream } from './hooks/useChatStream';
+import { useChatStream, NODE_SHORT_LABELS } from './hooks/useChatStream';
 import { Backgrounds } from './components/Backgrounds';
 import { Particles } from './components/Particles';
 import { LandingView } from './components/LandingView';
@@ -27,13 +27,13 @@ function App() {
     }, 3000);
   };
   
-  const { messages, setMessages, isLoading, statusText, sendMessage, loadSession } = useChatStream();
+  const { messages, setMessages, isLoading, statusText, activeWorkers, sendMessage, loadSession } = useChatStream();
   const messagesEndRef = useRef(null);
 
   // Auto-scroll
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, statusText]);
+  }, [messages, statusText, activeWorkers]);
 
   // Fetch sessions on load
   const fetchSessions = async () => {
@@ -72,7 +72,8 @@ function App() {
     const id = sessionToDelete;
     
     try {
-      await fetch(`/api/sessions/${id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/sessions/${id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       if (currentThreadId === id) {
         setCurrentThreadId(null);
         setMessages([]);
@@ -81,6 +82,7 @@ function App() {
       showToast("Archive Purged Successfully.");
     } catch (err) {
       console.error('Failed to delete session', err);
+      showToast("Failed to purge archive.");
     } finally {
       setSessionToDelete(null);
     }
@@ -110,15 +112,17 @@ function App() {
     }
 
     try {
-      await fetch(`/api/sessions/${currentThreadId}`, {
+      const res = await fetch(`/api/sessions/${currentThreadId}/rename`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ custom_name: newName })
+        body: JSON.stringify({ name: newName })
       });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       fetchSessions();
       showToast("Archive Renamed Successfully.");
     } catch (err) {
       console.error('Failed to rename session', err);
+      showToast("Failed to rename archive.");
     } finally {
       setIsEditingTitle(false);
     }
@@ -130,15 +134,17 @@ function App() {
     if (!newName) return;
 
     try {
-      await fetch(`/api/sessions/${threadId}`, {
+      const res = await fetch(`/api/sessions/${threadId}/rename`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ custom_name: newName })
+        body: JSON.stringify({ name: newName })
       });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       fetchSessions();
       showToast("Archive Renamed Successfully.");
     } catch (err) {
       console.error('Failed to rename session', err);
+      showToast("Failed to rename archive.");
     }
   };
 
@@ -336,6 +342,25 @@ function App() {
               );
             })}
             
+            {/* Parallel specialist progress (fan-out turns only) */}
+            {activeWorkers.length > 1 && (
+              <div className="hextech-terminal">
+                <div className="hextech-terminal-header">
+                  <span>🛰️ Dispatched {activeWorkers.length} specialists in parallel</span>
+                </div>
+                <div className="worker-progress-list">
+                  {activeWorkers.map(worker => (
+                    <div key={worker.name} className={`worker-progress-item ${worker.status}`}>
+                      <span className="worker-progress-icon">
+                        {worker.status === 'done' ? '✅' : <span className="thinking-pulse"></span>}
+                      </span>
+                      <span>{NODE_SHORT_LABELS[worker.name] || worker.name}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Status Indicator */}
             {statusText && (
               <div className="hextech-terminal">

@@ -1,9 +1,11 @@
 import os
 from dotenv import load_dotenv
-from langchain_core.messages import SystemMessage, ToolMessage, AIMessage
+from langchain_core.messages import SystemMessage, ToolMessage, AIMessage, HumanMessage
 from langchain_tavily import TavilySearch
 from app.agent_logger import log_llm_response, log_tool_result
 from app.agent.llm import get_llm, invoke_with_retry
+from app.agent.prompts import with_subtask, FINAL_SYNTHESIS_INSTRUCTION, RESEARCH_OUTPUT_FORMAT
+from app.agent.state import worker_return
 
 load_dotenv()
 
@@ -12,7 +14,7 @@ llm = get_llm("deepseek/deepseek-v4-flash", temperature=0.3)
 tavily_tool = TavilySearch(max_results=5)
 
 async def research_worker_node(state):
-    system_msg = SystemMessage(content="""\
+    system_msg = SystemMessage(content=with_subtask("""\
 You are the **LoL Research Analyst**, an elite investigator who synthesizes community sentiment, patch analysis, and strategic insights into actionable intelligence reports.
 
 ## YOUR MISSION
@@ -33,30 +35,9 @@ Deliver a **Community Intelligence Report** that gives the user a clear, opinion
    - Using champion nicknames or abbreviations
    - Adding "2026" or current season number
 
-## REPORT STRUCTURE
-Your final response MUST follow this format:
+""" + RESEARCH_OUTPUT_FORMAT, state.get("task")))
 
-### Current Meta Status
-_Where does this champion/topic stand in the current meta? Include any relevant win rate or pick rate context._
-
-### Community Sentiment
-_What are players saying? Quote or paraphrase specific Reddit threads, pro opinions, or community debates. Mention if sentiment is divided._
-
-### The Verdict
-_Your clear, opinionated recommendation. Don't sit on the fence — give the user a direct answer with reasoning._
-
-### Sources
-_List 2-3 of the most relevant sources with brief descriptions of what they contain._
-
-## TONE & STYLE
-- Be conversational but authoritative — like an analyst on a League podcast.
-- Take a clear stance on controversial topics, but acknowledge the other side.
-- Use **bold** for emphasis and key data points.
-- Keep the total response to ~300 words — dense and valuable, not padded.
-- Never say "based on my research" — just present the findings confidently.
-""")
-
-    messages = [system_msg] + state["messages"]
+    messages = [system_msg] + list(state["messages"])
     
     # Identify the node for the Supervisor
     node_name = "ResearchWorker"
@@ -70,9 +51,12 @@ _List 2-3 of the most relevant sources with brief descriptions of what they cont
 
     while attempts < max_retries:
         try:
-            # If we are at the last attempt, unbind tools to force a final text response
+            # Last attempt: unbind tools AND say so, otherwise the model emits a
+            # tool call as raw markup in the content (see FINAL_SYNTHESIS_INSTRUCTION).
             if attempts == max_retries - 1:
-                response = await invoke_with_retry(llm, messages)
+                response = await invoke_with_retry(
+                    llm, messages + [HumanMessage(content=FINAL_SYNTHESIS_INSTRUCTION)]
+                )
             else:
                 response = await invoke_with_retry(agent_with_tools, messages)
         except Exception as e:
@@ -113,4 +97,4 @@ _List 2-3 of the most relevant sources with brief descriptions of what they cont
         attempts += 1
         print(f"🔄 {node_name} completed step {attempts}/{max_retries}")
 
-    return {"messages": new_messages}
+    return worker_return(state, "ResearchWorker", new_messages)
