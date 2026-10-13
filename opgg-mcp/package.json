@@ -20,7 +20,8 @@
   "types": "dist/index.d.ts",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.10.0",
-    "eventsource": "^3.0.6"
+    "eventsource": "^3.0.6",
+    "zod": "^3.25 || ^4.0"
   },
   "repository": {
     "url": "https://github.com/opgginc/opgg-mcp"

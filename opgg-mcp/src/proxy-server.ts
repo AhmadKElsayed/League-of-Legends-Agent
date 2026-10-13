@@ -7,6 +7,7 @@ import {
   ListResourcesRequestSchema,
   ListResourceTemplatesRequestSchema,
   ListToolsRequestSchema,
+  ListToolsResultSchema,
   LoggingMessageNotificationSchema,
   ReadResourceRequestSchema,
   SubscribeRequestSchema,
@@ -15,6 +16,21 @@ import {
   ServerCapabilities,
 } from "@modelcontextprotocol/sdk/types.js";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { z } from "zod";
+
+/**
+ * tools/list, with per-tool validation relaxed.
+ *
+ * The OP.GG API returns tools whose `outputSchema.type` is not the literal
+ * "object" that the SDK's ListToolsResultSchema requires (outputSchema became
+ * a validated field in the 2025-06-18 spec, enforced from SDK 1.17 onward), so
+ * `client.listTools()` throws before we ever see the payload. This keeps the
+ * result envelope validated and only loosens the individual tool entries, which
+ * are stripped of outputSchema below.
+ */
+const LooseListToolsResultSchema = ListToolsResultSchema.extend({
+  tools: z.array(z.any()),
+});
 
 export const proxyServer = async ({
   server,
@@ -84,21 +100,14 @@ export const proxyServer = async ({
     });
 
     server.setRequestHandler(ListToolsRequestSchema, async (args) => {
-      // Bypass Zod validation by using a dummy schema
-      const anySchema = {
-        _def: {},
-        parse: (data: any) => data,
-        safeParse: (data: any) => ({ success: true, data })
-      } as any;
       const response = await client.request(
         { method: "tools/list", params: args.params },
-        anySchema
-      ) as any;
-      if (response && response.tools) {
-        for (const tool of response.tools) {
-          if ('outputSchema' in tool) {
-            delete (tool as any).outputSchema;
-          }
+        LooseListToolsResultSchema
+      );
+      // Drop the field the downstream client would reject for the same reason.
+      for (const tool of response.tools) {
+        if (tool && 'outputSchema' in tool) {
+          delete tool.outputSchema;
         }
       }
       return response;
